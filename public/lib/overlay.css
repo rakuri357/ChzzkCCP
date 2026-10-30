@@ -1,0 +1,40 @@
+:root {
+  --font-size: 24px;
+  --text: #ffffff;
+  --outline: #000000;
+  --bg: rgba(0, 0, 0, 0);
+  --font: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+}
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+body { font-family: var(--font); font-size: var(--font-size); color: var(--text); }
+body.preview {
+  background: repeating-conic-gradient(#3a3f4b 0% 25%, #2b2f38 0% 50%) 50% / 28px 28px;
+}
+#chat {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 8px 12px; gap: 4px; overflow: hidden;
+  background: var(--bg);
+}
+.line {
+  line-height: 1.35; word-break: break-word; overflow-wrap: anywhere;
+  -webkit-text-stroke: 0.14em var(--outline);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  animation: line-in 0.18s ease-out;
+}
+.line.leaving { opacity: 0; transition: opacity 0.6s ease; }
+.badges { margin-right: 0.3em; white-space: nowrap; }
+.badges img { height: 1.05em; width: auto; vertical-align: -0.15em; margin-right: 0.15em; }
+.nick { font-weight: 800; margin-right: 0.45em; }
+.msg { font-weight: 600; }
+body.no-badges .badges { display: none; }
+body.no-nick .nick { display: none; }
+#status {
+  position: absolute; left: 10px; top: 10px; max-width: calc(100% - 20px);
+  padding: 8px 12px; border-radius: 8px; font-size: 14px; line-height: 1.45; font-weight: 600;
+  background: rgba(20, 22, 28, 0.88); color: #e8ebf5; -webkit-text-stroke: 0; text-shadow: none;
+}
+#status.error { background: rgba(120, 28, 40, 0.92); color: #fff; }
+#status small { display: block; font-weight: 400; opacity: 0.9; margin-top: 2px; }
+@keyframes line-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

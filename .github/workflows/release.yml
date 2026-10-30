@@ -1,0 +1,78 @@
+name: Release
+
+# v0.2.0 같은 이름표(태그)를 올리면, 윈도우에서 .exe를 만들어 릴리스에 첨부합니다.
+#   git tag v0.2.0 && git push origin v0.2.0
+# 직접 실행(Actions 탭 → Release → Run workflow)하면 릴리스를 만들지 않고 결과물만 내려받을 수 있게 올립니다.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y lua5.1
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: npm test
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 태그와 package.json 버전이 같은지 확인
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "태그($GITHUB_REF_NAME)와 package.json 버전(v$VERSION)이 다릅니다. 둘을 맞춘 뒤 다시 올려 주십시오."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # 윈도우에서 빌드하면 앱 안쪽 exe의 아이콘과 버전 정보까지 함께 적용됩니다.
+      - name: 윈도우용 포터블 exe 만들기
+        run: npx electron-builder --win --x64 --publish never --config.win.signAndEditExecutable=true
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: 릴리스 파일 모으기
+        shell: bash
+        run: |
+          mkdir release
+          cp dist/ChzzkChatConPlus-*-portable.exe release/
+          cp obs/chzzkchatconplus-obs.lua release/
+          cp docs/USAGE-ko.txt release/
+          (cd release && sha256sum * > SHA256SUMS.txt)
+          ls -la release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChzzkChatConPlus-windows
+          path: release/*
+
+      - name: 릴리스에 올리기
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          body_path: .github/release-body.md
+          generate_release_notes: true

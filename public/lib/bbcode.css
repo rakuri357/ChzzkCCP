@@ -1,0 +1,52 @@
+/* BBCode 효과 스타일 - 오버레이, 목록 페이지, 확장 프로그램이 같이 씁니다. */
+.bb-b { font-weight: 800; }
+.bb-i { font-style: italic; }
+.bb-u { text-decoration: underline; }
+.bb-s { text-decoration: line-through; }
+.bb-glow {
+  text-shadow: 0 0 4px var(--glow, #fff), 0 0 10px var(--glow, #fff), 0 0 18px var(--glow, #fff);
+}
+.bb-blink { animation: bb-blink 1s steps(2, start) infinite; }
+.bb-rainbow {
+  background: linear-gradient(90deg, #ff4d4d, #ffb23d, #ffe83d, #4dff88, #3dd6ff, #7a6bff, #ff4dd2, #ff4d4d);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  text-shadow: none;
+  /* 글자 채움이 투명이라 오버레이의 굵은 글자 테두리가 안쪽까지 덮어버림 → 테두리를 끄고 그림자 윤곽으로 대체 */
+  -webkit-text-stroke: 0;
+  filter:
+    drop-shadow(1px 0 0 var(--outline, rgba(0, 0, 0, 0.85))) drop-shadow(-1px 0 0 var(--outline, rgba(0, 0, 0, 0.85)))
+    drop-shadow(0 1px 0 var(--outline, rgba(0, 0, 0, 0.85))) drop-shadow(0 -1px 0 var(--outline, rgba(0, 0, 0, 0.85)));
+  animation: bb-rainbow 2.4s linear infinite;
+}
+.bb-shake { display: inline-block; animation: bb-shake 0.35s linear infinite; }
+.bb-marquee {
+  display: inline-block;
+  width: 9em;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.bb-marquee-inner {
+  display: inline-block;
+  padding-left: 100%;
+  animation: bb-marquee 7s linear infinite;
+}
+.cmd-img, .cc-emoji { vertical-align: middle; user-select: none; }
+.cmd-img { height: 2em; width: auto; }
+.cc-emoji { height: 1.6em; width: auto; }
+
+@keyframes bb-blink { 0% { opacity: 1; } 50% { opacity: 0.1; } }
+@keyframes bb-rainbow { to { background-position: -200% 0; } }
+@keyframes bb-shake {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(-1px, 1px) rotate(-1.5deg); }
+  50% { transform: translate(1px, -1px) rotate(1.5deg); }
+  75% { transform: translate(-1px, -1px) rotate(-1deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+@keyframes bb-marquee { to { transform: translateX(-100%); } }

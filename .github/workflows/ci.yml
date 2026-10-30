@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: OBS 스크립트(Lua) 시험에 필요한 Lua 설치
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+      - name: 의존성 설치 (Electron 바이너리는 시험에 필요 없어서 건너뜁니다)
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: 시험
+        run: npm test

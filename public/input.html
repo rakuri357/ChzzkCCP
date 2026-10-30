@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChzzkChatConPlus 설정</title>
+<link rel="stylesheet" href="lib/input.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <h1>ChzzkChatConPlus 설정</h1>
+    <button id="collapseAll" class="small" type="button">모두 접기</button>
+    <button id="expandAll" class="small" type="button">모두 펴기</button>
+    <span id="savechip" class="chip" role="status">불러오는 중…</span>
+  </div>
+</header>
+
+<div class="layout">
+  <main class="col">
+    <section class="card" id="s-obs"></section>
+    <section class="card" id="s-channel"></section>
+    <section class="card" id="s-images"></section>
+    <section class="card" id="s-bbcode"></section>
+    <section class="card" id="s-hidden"></section>
+    <section class="card" id="s-permissions"></section>
+    <section class="card" id="s-style"></section>
+    <section class="card" id="s-advanced"></section>
+  </main>
+  <aside class="side">
+    <div class="side-in">
+      <h2>미리보기</h2>
+      <iframe id="pv" src="output.html?demo=1&amp;preview=1" title="오버레이 미리보기"></iframe>
+      <p class="note">바꾸는 즉시 반영됩니다. 실제 방송에서는 내 채널의 채팅이 이 모양으로 나옵니다.</p>
+    </div>
+  </aside>
+</div>
+
+<div id="dropveil" hidden><div>이미지를 놓으면 추가돼요</div></div>
+<div id="toast" role="status"></div>
+
+<script src="lib/bbcode.js"></script>
+<script src="lib/common.js"></script>
+<script src="lib/input.js"></script>
+</body>
+</html>
