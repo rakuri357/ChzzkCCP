@@ -38,16 +38,34 @@ test('HTML 문자열은 요소가 되지 않는다', () => {
   assert.ok(box.textContent.includes('<img src=x onerror=alert(1)>'));
 });
 
-test('닫히지 않은 태그는 글자로 남고 내용은 유지', () => {
-  assert.equal(plain('[b]안녕 [i]반가워'), '[b]안녕 [i]반가워');
+test('닫는 태그가 없으면 메시지 끝까지 적용된다', () => {
+  const box = dom('[b]안녕 [i]반가워');
+  assert.equal(box.querySelector('.bb-b').textContent, '안녕 반가워');
+  assert.equal(box.querySelector('.bb-b .bb-i').textContent, '반가워');
+  assert.equal(box.textContent, '안녕 반가워');
+});
+
+test('닫는 태그만 있으면 글자로 남는다', () => {
   assert.equal(plain('안녕[/b]'), '안녕[/b]');
+});
+
+test('닫는 태그를 쓰면 그 범위까지만 적용되고, 섞어 써도 된다', () => {
+  const box = dom('[b]굵게[/b] 보통 [color=red]빨강');
+  assert.equal(box.querySelector('.bb-b').textContent, '굵게');
+  assert.equal(box.querySelector('.bb-color').textContent, '빨강');
+  assert.equal(box.textContent, '굵게 보통 빨강');
+});
+
+test('형식이 틀리거나 한도를 넘은 태그는 닫는 태그가 없어도 글자 그대로', () => {
+  assert.equal(dom('[color=bad]x').textContent, '[color=bad]x');
+  assert.equal(dom('[blink]x', { limits: { maxEffects: 0 } }).textContent, '[blink]x');
 });
 
 test('엇갈린 태그 처리', () => {
   const nodes = BB.parse('[b]a[i]b[/b]c[/i]');
   assert.equal(nodes[0].type, 'tag'); // [b]...[/b]는 정상적으로 닫히고
   assert.equal(nodes[0].name, 'b');
-  assert.equal(BB.toPlainText(nodes), 'a[i]bc[/i]'); // 짝이 안 맞는 [i]와 [/i]는 글자로 남음
+  assert.equal(BB.toPlainText(nodes), 'abc[/i]'); // [/b]를 만나면 안쪽 [i]도 함께 끝나고, 남은 [/i]는 글자로 남음
 });
 
 test('중첩 깊이 한도', () => {
@@ -191,4 +209,77 @@ test('일상 글자와 겹치는 [숫자]나 모르는 이름은 글자 그대�
 test('짝이 이름만 달라도(별칭/기본) 같은 태그면 닫힌다', () => {
   const box = dom('[무지개]x[/rainbow]', { aliases: { 무지개: 'rainbow', rainbow: 'rainbow' } });
   assert.equal(box.querySelector('.bb-rainbow').textContent, 'x');
+});
+
+// ---------- 기본 이름, 한글 색, 새 태그 ----------
+test('기본 이름: 영문, 단축, 한글 모두 쓸 수 있다', () => {
+  for (const [tag, names] of Object.entries({ b: ['b', '굵게'], rainbow: ['rainbow', 'rb', '무지개'], wave: ['wave', 'wv', '물결', '파도'], pulse: ['pulse', 'pl', '맥박', '펄스'], size: ['size', 'sz', '크기'], color: ['color', 'cl', '색'] })) {
+    for (const n of names) {
+      const arg = tag === 'color' ? '=red' : tag === 'size' ? '=150' : '';
+      assert.ok(dom('[' + n + arg + ']x[/' + n + ']').querySelector('.bb-' + tag), n);
+    }
+  }
+});
+
+test('기본 이름은 서로 겹치지 않는다', () => {
+  const seen = {};
+  for (const [tag, def] of Object.entries(BB.TAG_DEFS)) for (const n of def.names) { assert.ok(!seen[n], n); seen[n] = tag; }
+});
+
+test('색 이름을 한글로: [색=빨강], 초록과 녹색 모두', () => {
+  assert.equal(dom('[색=빨강]x').querySelector('.bb-color').style.color, 'red');
+  assert.equal(dom('[색=초록]x').querySelector('.bb-color').style.color, 'green');
+  assert.equal(dom('[색=녹색]x').querySelector('.bb-color').style.color, 'green');
+  assert.equal(dom('[색=하늘색]x').querySelector('.bb-color').style.color, 'skyblue');
+  assert.equal(dom('[색=없는색]x').querySelector('.bb-color'), null);
+});
+
+test('한글 색 이름이 영어 색 24개를 모두 덮는다', () => {
+  const targets = new Set();
+  for (const k of ['빨강', '주황', '노랑', '초록', '연두', '청록', '아쿠아', '파랑', '남색', '보라', '자주', '마젠타', '분홍', '하양', '검정', '회색', '금색', '하늘', '토마토', '산호', '틸', '갈색', '은색']) {
+    const el = dom('[색=' + k + ']x').querySelector('.bb-color');
+    assert.ok(el, k);
+    targets.add(el.style.color);
+  }
+  assert.equal(targets.size, 23); // gray와 grey는 같은 회색으로 처리
+});
+
+test('배경색, 테두리', () => {
+  assert.equal(dom('[bg=yellow]x').querySelector('.bb-bg').style.backgroundColor, 'yellow');
+  assert.equal(dom('[배경=노랑]x').querySelector('.bb-bg').style.backgroundColor, 'yellow');
+  assert.equal(dom('[outline=red]x').querySelector('.bb-outline').style.getPropertyValue('--ol'), 'red');
+  assert.equal(dom('[외곽]x').querySelector('.bb-outline').style.getPropertyValue('--ol'), '#000000');
+  assert.equal(dom('[bg]x').querySelector('.bb-bg'), null);
+});
+
+test('그라데이션: 색 둘은 그라데이션, 하나면 단색, 셋 이상이나 틀린 색은 글자', () => {
+  const two = dom('[grad=red,blue]x').querySelector('.bb-grad');
+  assert.ok(two.classList.contains('bb-grad2'));
+  assert.equal(two.style.getPropertyValue('--g1'), 'red');
+  assert.equal(two.style.getPropertyValue('--g2'), 'blue');
+  const one = dom('[그라=빨강]x').querySelector('.bb-grad');
+  assert.equal(one.style.color, 'red');
+  assert.ok(!one.classList.contains('bb-grad2'));
+  assert.equal(dom('[grad=red,blue,green]x').querySelector('.bb-grad'), null);
+  assert.equal(dom('[grad=red,nope]x').querySelector('.bb-grad'), null);
+  assert.equal(dom('[grad]x').querySelector('.bb-grad'), null);
+  assert.ok(dom('[grad=#ff0000,#0000ff]x').querySelector('.bb-grad2'));
+});
+
+test('물결과 타자기는 글자마다 나뉘고, 타자기는 3초 안에 끝난다', () => {
+  const w = dom('[wave]abc[/wave]');
+  assert.deepEqual([...w.querySelectorAll('.bb-wave .bb-c')].map((e) => e.textContent), ['a', 'b', 'c']);
+  assert.equal(w.textContent, 'abc');
+  const t = dom('[type]' + 'a'.repeat(100) + '[/type]');
+  const cs = [...t.querySelectorAll('.bb-type .bb-c')];
+  assert.equal(cs.length, 100);
+  assert.ok(parseFloat(cs[99].style.animationDelay) <= 3);
+  assert.equal(cs[0].style.animationDelay, '0.00s');
+});
+
+test('회전, 두근두근은 움직이는 효과 한도에 걸린다', () => {
+  const box = dom('[spin]a[/spin][pulse]b[/pulse][wave]c[/wave][type]d[/type]');
+  assert.equal(box.querySelectorAll('.bb-spin, .bb-pulse, .bb-wave').length, 3);
+  assert.equal(box.querySelector('.bb-type'), null);
+  assert.ok(box.textContent.includes('[type]d'));
 });

@@ -53,7 +53,7 @@ test('첫 실행은 빈 상태로 시작하고, 설정 저장, 치지직 접속�
   assert.deepEqual(st0.images, []);
   assert.equal(st0.status.state, 'no-channel');
   assert.ok(st0.urls.overlay.endsWith('/output.html'));
-  assert.equal(st0.config.overlay.imageHeight, '2.4em');
+  assert.equal(st0.config.overlay.imageHeight, '3em');
   assert.equal(st0.config.ui.autoCommand, true);
   // 이미지와 명령어는 사용자가 직접 추가
   await upload(app.port, '감사.png', '');

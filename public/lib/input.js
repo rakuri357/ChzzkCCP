@@ -241,7 +241,7 @@
   // ---------- 화면: 1. OBS에 넣기 ----------
   function renderObs() {
     var c = begin('s-obs', 'obs', '1. OBS에 넣기');
-    c.appendChild(h('p', { class: 'lead', text: 'OBS에서 소스 + → 브라우저를 추가하고, 아래 주소를 URL에 붙여 넣으십시오. 너비와 높이는 채팅을 놓을 크기로 정하십시오. (예: 500 × 700)' }));
+    c.appendChild(h('p', { class: 'lead', text: 'OBS 브라우저 소스의 URL에 아래 주소를 붙여 넣으십시오. 권장 크기는 500 × 700입니다.' }));
     var inp = h('input', { type: 'text', value: S.urls.overlay, readonly: true, 'aria-label': 'OBS 브라우저 소스 주소' });
     c.appendChild(h('div', { class: 'row' },
       field('OBS 브라우저 소스 주소', inp),
@@ -250,9 +250,9 @@
         if (navigator.clipboard) navigator.clipboard.writeText(S.urls.overlay).then(done, function () { inp.select(); document.execCommand('copy'); done(); });
         else { inp.select(); document.execCommand('copy'); done(); }
       } })));
-    c.appendChild(h('p', { class: 'msg muted', text: '이 앱(ChzzkChatConPlus)이 켜져 있는 동안에만 OBS에 채팅이 나옵니다. 설정을 바꾸면 OBS에는 바로 반영됩니다.' }));
+    c.appendChild(h('p', { class: 'msg muted', text: '앱이 켜져 있는 동안에만 OBS에 채팅이 나옵니다. 설정은 바로 반영됩니다.' }));
     var row = h('div', { class: 'row', style: 'margin-top:4px' });
-    row.appendChild(h('span', { class: 'msg muted', style: 'margin:0', text: '이미지와 설정이 저장되는 폴더: ' + S.dataDir }));
+    row.appendChild(h('span', { class: 'msg muted', style: 'margin:0', text: '저장 폴더: ' + S.dataDir }));
     if (S.canOpenFolder) row.appendChild(h('button', { class: 'link', type: 'button', text: '폴더 열기', onclick: function () {
       api('POST', '/api/open-data-folder', {}).catch(function (e) { toast(e.message, true); });
     } }));
@@ -301,7 +301,7 @@
 
   function renderChannel() {
     var c = begin('s-channel', 'channel', '2. 내 채널');
-    c.appendChild(h('p', { class: 'lead', text: '내 치지직 채널 페이지 주소를 붙여 넣으면 그 채널의 채팅을 방송 화면에 보여 줍니다. 로그인은 필요 없습니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '내 치지직 채널 페이지 주소를 붙여 넣으십시오. 로그인은 필요 없습니다.' }));
     c.appendChild(h('div', { class: 'row' }, field('내 채널 페이지 주소', text(S.cfg.channel.url, function (v) {
       S.cfg.channel.url = v; channelMsg(); changed();
     }, { placeholder: 'https://chzzk.naver.com/내채널ID' }))));
@@ -495,7 +495,7 @@
       });
       panelRows.push(h('div', { class: 'row' }, field('태그 (images 안의 폴더)', picker.el)), newRow);
     }
-    panelRows.push(h('p', { class: 'msg muted', style: 'margin:0', text: '높이와 조건은 이 이미지의 모든 명령어에 똑같이 적용됩니다. 높이는 글자 크기 기준입니다 (2.4em = 글자의 2.4배). 비워 두면 "7. 화면 스타일"의 기본 높이를 따릅니다. 명령어를 먼저 입력해야 설정할 수 있습니다.' }));
+    panelRows.push(h('p', { class: 'msg muted', style: 'margin:0', text: '높이와 조건은 이 이미지의 모든 명령어에 적용됩니다. 높이는 글자 크기의 배수입니다 (2.4em = 2.4배). 비우면 기본 높이를 따릅니다. 명령어를 먼저 입력하십시오.' }));
     var panel = h.apply(null, ['div', { class: 'rowpanel', hidden: true }].concat(panelRows));
     var gear = h('button', { class: 'link', type: 'button', text: '설정', 'aria-expanded': 'false', onclick: function () {
       panel.hidden = !panel.hidden; gear.setAttribute('aria-expanded', String(!panel.hidden));
@@ -616,7 +616,7 @@
   function renderImages() {
     var c = begin('s-images', 'images', '3. 이미지와 명령어');
     S.imgFilter.sort = S.cfg.ui.imageSort || 'name';
-    c.appendChild(h('p', { class: 'lead', text: '추가한 이미지가 아래에 나타납니다. 이미지마다 채팅 명령어를 입력하면, 시청자가 그 글자를 채팅에 쓸 때 방송 화면에서 이미지로 바뀝니다. 한 이미지에 명령어를 여러 개 입력할 수 있습니다. (예: ~감사, ~감사합니다, ~땡큐) images 폴더 안에 폴더를 만들어 이미지를 넣으면 그 폴더 이름이 태그가 됩니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '이미지마다 명령어를 입력하면 채팅에서 그 글자가 이미지로 바뀝니다. 명령어는 여러 개 입력할 수 있고 (예: ~감사, ~땡큐), images 안의 폴더 이름은 태그가 됩니다.' }));
     var fileIn = h('input', { type: 'file', multiple: true, accept: '.png,.jpg,.jpeg,.gif,.webp,.svg,image/*', style: 'display:none',
       onchange: function (e) { addFiles(Array.prototype.slice.call(e.target.files)); e.target.value = ''; } });
     c.appendChild(h('div', { class: 'imgbar' },
@@ -644,7 +644,7 @@
   // ---------- 화면: 5. 숨길 채팅 ----------
   function renderHidden() {
     var c = begin('s-hidden', 'hidden', '5. 방송 화면에서 숨길 채팅');
-    c.appendChild(h('p', { class: 'lead', text: '치지직 채팅창에는 그대로 보이지만, 방송 화면에는 나오지 않게 할 채팅입니다. 예를 들어 다른 챗봇을 부르는 명령어를 숨길 수 있습니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '치지직 채팅창에는 보이지만 방송 화면에서는 숨길 채팅입니다. (예: 챗봇 명령어)' }));
     c.appendChild(h('div', { class: 'row' },
       field('숨길 명령어 (한 줄에 하나, 예: !목록)', h('textarea', { value: S.cfg.hidden.commands.join('\n'), placeholder: '!목록\n!명령어', oninput: function (e) {
         S.cfg.hidden.commands = e.target.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean); updateSummaries(); changed();
@@ -657,11 +657,12 @@
 
   // ---------- 화면: 4. 글자 꾸미기 ----------
   function tagEntry(canon) { return S.cfg.bbcode.tags[canon]; }
-  function tagNames(canon) { var e = tagEntry(canon); return e && Array.isArray(e.names) ? e.names : [canon]; }
+  function tagNames(canon) { var e = tagEntry(canon); return e && Array.isArray(e.names) ? e.names : BB.TAG_DEFS[canon].names; }
   // 이름을 바꾼 결과를 설정에 기록 (기본 상태로 돌아오면 흔적을 지움)
   function setTagNames(canon, names) {
     var e = S.cfg.bbcode.tags[canon] || (S.cfg.bbcode.tags[canon] = {});
-    if (names.length === 1 && names[0] === canon) delete e.names; else e.names = names;
+    var def = BB.TAG_DEFS[canon].names;
+    if (names.length === def.length && names.every(function (n, k) { return n === def[k]; })) delete e.names; else e.names = names;
     if (!Object.keys(e).length) delete S.cfg.bbcode.tags[canon];
   }
   function tagOwner(name) {
@@ -685,7 +686,7 @@
     sw.classList.add('headswitch');
     var c = begin('s-bbcode', 'bbcode', '4. 글자 꾸미기', sw);
     var list = h('div', { class: 'tags2' + (bb.enabled ? '' : ' off') });
-    c.appendChild(h('p', { class: 'lead', text: '시청자가 채팅에 [color=red]글자[/color] 처럼 쓰면 방송 화면에서 꾸며진 글자로 나옵니다. 치지직 채팅창에는 쓴 그대로 보입니다. 태그 이름은 바꿀 수 있습니다. (예: [무지개]글자[/무지개])' }));
+    c.appendChild(h('p', { class: 'lead', text: '채팅에 [color=red]글자[/color]처럼 쓰면 방송 화면에서 꾸며집니다. 태그 이름은 바꿀 수 있고, 닫는 태그는 생략할 수 있습니다. (예: [색=빨강]글자)' }));
     function setAll(on) {
       Object.keys(BB.TAG_DEFS).forEach(function (canon) {
         var e = tagEntry(canon) || (S.cfg.bbcode.tags[canon] = {});
@@ -736,7 +737,7 @@
     var L2 = bb.limits;
     function lim(label, key, min, max) { return field(label, num(L2[key], min, max, function (n) { L2[key] = n; changed(); }), 'small'); }
     c.appendChild(h('details', null, h('summary', { text: '남용 방지 한도 (보통은 그대로 두십시오)' }),
-      h('p', { class: 'msg muted', text: '한도를 넘는 꾸밈은 적용되지 않고 쓴 글자 그대로 나옵니다.' }),
+      h('p', { class: 'msg muted', text: '한도를 넘는 꾸밈은 글자 그대로 나옵니다.' }),
       h('div', { class: 'row' }, lim('최대 글자 수', 'maxLength', 20, 1000), lim('태그 겹치는 깊이', 'maxDepth', 1, 10), lim('태그 개수', 'maxTags', 1, 50)),
       h('div', { class: 'row' }, lim('움직이는 효과 수', 'maxEffects', 0, 20), lim('글자 크기 하한(%)', 'minSize', 30, 100), lim('글자 크기 상한(%)', 'maxSize', 100, 400), lim('이미지 수', 'maxImages', 0, 30))));
   }
@@ -768,7 +769,7 @@
   function renderPermissions() {
     var c = begin('s-permissions', 'permissions', '6. 권한');
     var perm = S.cfg.permissions;
-    c.appendChild(h('p', { class: 'lead', text: '일반 시청자와 구독자가 쓸 수 있는 이미지 명령어와 글자 꾸미기를 정합니다. 권한이 없는 사람이 쓰면 이미지나 꾸밈이 적용되지 않고 쓴 글자 그대로 나옵니다. 스트리머와 운영진(채팅 운영자, 채널 관리자)은 항상 모두 쓸 수 있고, 구독자는 일반 시청자가 쓸 수 있는 기능을 항상 쓸 수 있습니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '일반 시청자와 구독자가 쓸 수 있는 이미지 명령어와 글자 꾸미기를 정합니다. 권한이 없으면 쓴 글자 그대로 나옵니다. 스트리머와 운영진은 항상 모두 쓸 수 있습니다.' }));
 
     function head() {
       return h('div', { class: 'permhead' }, h('span', { text: '' }), h('span', { class: 'permcol', text: '일반 시청자' }), h('span', { class: 'permcol', text: '구독자' }), h('span', { text: '' }));
@@ -782,10 +783,10 @@
       head(),
       h('div', { class: 'permrow' }, h('span', { class: 'permname', text: '이미지 명령어' }), defImg.viewer, defImg.sub, h('span')),
       h('div', { class: 'permrow' }, h('span', { class: 'permname', text: '글자 꾸미기' }), defTag.viewer, defTag.sub, h('span')),
-      h('p', { class: 'msg muted', style: 'margin:6px 0 0', text: '아래에서 따로 정하지 않은 기능은 이 기본 권한을 따릅니다. 새로 추가하는 이미지와 명령어도 기본 권한을 따릅니다.' })));
+      h('p', { class: 'msg muted', style: 'margin:6px 0 0', text: '따로 정하지 않은 기능과 새로 추가하는 항목은 이 기본 권한을 따릅니다.' })));
 
     c.appendChild(h('div', { id: 'permlists' }));
-    c.appendChild(h('p', { class: 'msg muted', text: '구독자 여부는 치지직 채팅 정보로 판단합니다. 구독자 계정으로 내 채팅창에 채팅하면 2번 패널의 최근 채팅에 [구독 N개월]이 표시되는지 확인해 보십시오. 구독 정보를 읽지 못하면 구독자 전용 기능은 운영진 외에는 적용되지 않습니다.' }));
+    c.appendChild(h('p', { class: 'msg muted', text: '구독자 여부는 치지직 채팅 정보로 판단합니다. 2번 패널의 최근 채팅에 [구독 N개월]이 보이는지 확인하십시오. 읽지 못하면 구독자 전용 기능은 운영진만 쓸 수 있습니다.' }));
     S.permFilter = S.permFilter || { img: false, tag: false };
     renderPermLists();
     S.refreshPerms = refreshPermsIfChanged;
@@ -1013,7 +1014,7 @@
   function renderStyle() {
     var c = begin('s-style', 'style', '7. 화면 스타일');
     var o = S.cfg.overlay;
-    c.appendChild(h('p', { class: 'lead', text: '방송 화면에 나오는 채팅의 크기와 색입니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '채팅의 크기와 색입니다.' }));
     function color(label, key) {
       var inp = h('input', { type: 'color', value: /^#[0-9a-fA-F]{6}$/.test(o[key]) ? o[key] : '#ffffff', oninput: function (e) { o[key] = e.target.value; changed(); } });
       return field(label, inp, 'small');
@@ -1035,7 +1036,7 @@
     } });
     c.appendChild(h('div', { class: 'row' }, field('명령어 이미지 기본 높이 (글자 크기의 몇 배)', imgH, 'small'),
       h('div', { class: 'field' }, h('label', { text: '\u00a0' }), resetBtn)));
-    c.appendChild(h('p', { class: 'msg muted', style: 'margin:-4px 0 12px', text: '글자 크기가 24px이면 2.4배는 약 58px입니다. 글자 크기를 바꾸면 이미지도 같은 비율로 바뀝니다. 이미지 하나만 다르게 하려면 3번 패널의 이미지 행에서 "설정"을 누르십시오.' }));
+    c.appendChild(h('p', { class: 'msg muted', style: 'margin:-4px 0 12px', text: '글자 크기가 24px이면 3배는 72px입니다. 이미지 하나만 바꾸려면 3번 패널 행의 "설정"을 누르십시오.' }));
     S.updateResetBtn = updateResetBtn;   // 이미지 행에서 높이를 바꿀 때도 이 버튼의 개수와 활성 상태를 갱신합니다.
     updateResetBtn();
     var bg = parseRgba(o.backgroundColor);
@@ -1057,7 +1058,7 @@
     var c = $('s-advanced'); c.textContent = '';
     var ad = S.cfg.advanced;
     c.appendChild(h('details', null, h('summary', { text: '문제 해결용 설정 (보통은 건드릴 필요 없습니다)' }),
-      h('p', { class: 'msg muted', text: '치지직 접속 주소를 직접 바꿀 수 있습니다. 비워 두면 기본 주소를 씁니다.' }),
+      h('p', { class: 'msg muted', text: '비워 두면 기본 주소를 씁니다.' }),
       h('div', { class: 'row' }, field('채널 정보 서버', text(ad.apiBase, function (v) { ad.apiBase = v; changed(); }, { placeholder: 'https://api.chzzk.naver.com' }))),
       h('div', { class: 'row' }, field('채팅 권한 서버', text(ad.commApiBase, function (v) { ad.commApiBase = v; changed(); }, { placeholder: 'https://comm-api.game.naver.com' }))),
       h('div', { class: 'row' }, field('채팅 웹소켓 주소', text(ad.wsUrl, function (v) { ad.wsUrl = v; changed(); }, { placeholder: 'wss://kr-ss1.chat.naver.com/chat' })))));

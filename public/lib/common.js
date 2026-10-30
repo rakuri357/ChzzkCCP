@@ -12,7 +12,7 @@
   var MAX_TAG_DEPTH = 3;       // images 안의 폴더는 3단계까지 (태그 = 폴더 이름)
   var MAX_SEGMENT_LEN = 60;    // 폴더/파일 이름 하나의 최대 길이
   var HEIGHT_RE = /^\d{1,3}(\.\d{1,2})?(em|rem|px)$/;
-  var DEFAULT_IMAGE_HEIGHT = '2.4em';
+  var DEFAULT_IMAGE_HEIGHT = '3em';
   var CONFIG_VERSION = 3;
   var TAG_NAME_RE = /^[A-Za-z0-9_\uAC00-\uD7A3]{1,12}$/;
   var MAX_TAG_NAMES = 6;
@@ -62,7 +62,7 @@
       hidden: { commands: [], prefixes: [] },
       bbcode: { enabled: true, tags: {}, limits: JSON.parse(JSON.stringify(BB.DEFAULT_LIMITS)) },
       overlay: {
-        maxLines: 14, fontSize: 24, lineLifetimeSec: 0, showBadges: true, showNickname: true, showStatus: true,
+        maxLines: 14, fontSize: 24, lineLifetimeSec: 10, showBadges: true, showNickname: true, showStatus: true,
         textColor: '#ffffff', outlineColor: '#000000', backgroundColor: 'rgba(0,0,0,0)', fontFamily: '',
         imageHeight: DEFAULT_IMAGE_HEIGHT   // 명령어 이미지의 기본 높이 (글자 크기 기준). 이미지마다 따로 정하지 않으면 이 값을 씁니다.
       },
@@ -130,7 +130,7 @@
         var h = typeof x.height === 'string' ? x.height.trim() : '';
         h = validHeight(h) ? h : '';
         // 예전 버전(기본 높이 설정이 없던 때)은 모든 명령어에 2.4em이 저장되어 있었으므로, 기본값을 따르는 것으로 봅니다.
-        if (legacy && h === DEFAULT_IMAGE_HEIGHT) h = '';
+        if (legacy && h === '2.4em') h = '';
         entry = byImage[image] = { triggers: [], image: image, height: h, match: x.match === 'whole' ? 'whole' : 'anywhere', access: ACCESS.indexOf(x.access) >= 0 ? x.access : '' };
         order.push(image);
       }
@@ -169,14 +169,14 @@
 
   // ---------- 글자 꾸미기 태그 이름 ----------
   /**
-   * 태그마다 쓸 수 있는 이름(예: rainbow → ["rainbow", "무지개"])을 정하고, 이름이 겹치면 TAG_DEFS 순서상 앞의 태그가 가져갑니다.
+   * 태그마다 쓸 수 있는 이름(예: rainbow → ["rainbow", "rb", "무지개"], 기본값은 TAG_DEFS의 names)을 정하고, 이름이 겹치면 TAG_DEFS 순서상 앞의 태그가 가져갑니다.
    * 반환: { names: { 태그: [이름…] }, conflicts: [{ name, tag, owner }] }
    */
   function resolveTagNames(tagsCfg) {
     var names = {}, claimed = {}, conflicts = [];
     Object.keys(BB.TAG_DEFS).forEach(function (canon) {
       var entry = tagsCfg && tagsCfg[canon];
-      var list = entry && Array.isArray(entry.names) ? entry.names : [canon];
+      var list = entry && Array.isArray(entry.names) ? entry.names : BB.TAG_DEFS[canon].names;
       var out = [];
       list.forEach(function (n) {
         n = typeof n === 'string' ? n.trim().toLowerCase() : '';
@@ -206,7 +206,8 @@
       var e = cleaned[canon];
       var entry = {};
       if (e && e.enabled === false) entry.enabled = false;
-      var same = resolved[canon].length === 1 && resolved[canon][0] === canon;
+      var def = BB.TAG_DEFS[canon].names;
+      var same = resolved[canon].length === def.length && resolved[canon].every(function (n, k) { return n === def[k]; });
       if (e && e.names && !same) entry.names = resolved[canon];
       if (e && e.access) entry.access = e.access;
       if (Object.keys(entry).length) out[canon] = entry;

@@ -14,17 +14,24 @@
 
   /** 지원하는 태그 목록. 관리 페이지와 목록 페이지의 설명도 여기서 가져갑니다. */
   var TAG_DEFS = {
-    b:       { label: '굵게',       arg: 'none',     effect: false, example: '[b]굵게[/b]' },
-    i:       { label: '기울임',     arg: 'none',     effect: false, example: '[i]기울임[/i]' },
-    u:       { label: '밑줄',       arg: 'none',     effect: false, example: '[u]밑줄[/u]' },
-    s:       { label: '취소선',     arg: 'none',     effect: false, example: '[s]취소선[/s]' },
-    color:   { label: '글자 색',    arg: 'color',    effect: false, example: '[color=#ff5577]색칠[/color]' },
-    size:    { label: '글자 크기',  arg: 'size',     effect: false, example: '[size=150]크게[/size]' },
-    glow:    { label: '빛나는 글자', arg: 'color?',   effect: false, example: '[glow=#ffd400]반짝[/glow]' },
-    blink:   { label: '깜빡임',     arg: 'none',     effect: true,  example: '[blink]깜빡[/blink]' },
-    rainbow: { label: '무지개',     arg: 'none',     effect: true,  example: '[rainbow]무지개[/rainbow]' },
-    shake:   { label: '흔들림',     arg: 'none',     effect: true,  example: '[shake]덜덜[/shake]' },
-    marquee: { label: '흐르는 글자', arg: 'none',     effect: true,  example: '[marquee]흘러가요[/marquee]' }
+    b:       { label: '굵게',       arg: 'none',     effect: false, names: ['b', '굵게'],                     example: '[b]굵게[/b]' },
+    i:       { label: '기울임',     arg: 'none',     effect: false, names: ['i', '기울'],                     example: '[i]기울임[/i]' },
+    u:       { label: '밑줄',       arg: 'none',     effect: false, names: ['u', '밑줄'],                     example: '[u]밑줄[/u]' },
+    s:       { label: '취소선',     arg: 'none',     effect: false, names: ['s', '취소'],                     example: '[s]취소선[/s]' },
+    color:   { label: '글자 색',    arg: 'color',    effect: false, names: ['color', 'cl', '색'],             example: '[color=#ff5577]색칠[/color]' },
+    size:    { label: '글자 크기',  arg: 'size',     effect: false, names: ['size', 'sz', '크기'],            example: '[size=150]크게[/size]' },
+    glow:    { label: '빛나는 글자', arg: 'color?',   effect: false, names: ['glow', 'gl', '반짝'],            example: '[glow=#ffd400]반짝[/glow]' },
+    blink:   { label: '깜빡임',     arg: 'none',     effect: true,  names: ['blink', 'bl', '깜빡'],           example: '[blink]깜빡[/blink]' },
+    rainbow: { label: '무지개',     arg: 'none',     effect: true,  names: ['rainbow', 'rb', '무지개'],       example: '[rainbow]무지개[/rainbow]' },
+    shake:   { label: '흔들림',     arg: 'none',     effect: true,  names: ['shake', 'sk', '흔들'],           example: '[shake]덜덜[/shake]' },
+    marquee: { label: '흐르는 글자', arg: 'none',     effect: true,  names: ['marquee', 'mq', '흐름'],         example: '[marquee]흘러가요[/marquee]' },
+    bg:      { label: '배경색',     arg: 'color',    effect: false, names: ['bg', '배경'],                    example: '[bg=yellow]형광펜[/bg]' },
+    outline: { label: '테두리',     arg: 'color?',   effect: false, names: ['outline', 'ol', '외곽'],         example: '[outline=red]테두리[/outline]' },
+    grad:    { label: '그라데이션', arg: 'colors',   effect: false, names: ['grad', 'gr', '그라'],            example: '[grad=red,blue]그라데이션[/grad]' },
+    wave:    { label: '물결',       arg: 'none',     effect: true,  names: ['wave', 'wv', '물결', '파도'],    example: '[wave]출렁출렁[/wave]' },
+    type:    { label: '타자기',     arg: 'none',     effect: true,  names: ['type', 'ty', '타자'],            example: '[type]타닥타닥[/type]' },
+    spin:    { label: '회전',       arg: 'none',     effect: true,  names: ['spin', 'sp', '회전'],            example: '[spin]빙글빙글[/spin]' },
+    pulse:   { label: '두근두근',   arg: 'none',     effect: true,  names: ['pulse', 'pl', '맥박', '펄스'],   example: '[pulse]두근[/pulse]' }
   };
 
   var DEFAULT_LIMITS = {
@@ -43,8 +50,41 @@
     gold: 1, skyblue: 1, tomato: 1, coral: 1, teal: 1, brown: 1, silver: 1
   };
 
+  // 한글 색 이름 → 영어 색 이름
+  var COLOR_KO = {
+    '빨강': 'red', '빨간색': 'red', '레드': 'red',
+    '주황': 'orange', '주황색': 'orange',
+    '노랑': 'yellow', '노란색': 'yellow',
+    '초록': 'green', '초록색': 'green', '녹색': 'green',
+    '연두': 'lime', '연두색': 'lime',
+    '청록': 'cyan', '청록색': 'cyan', '시안': 'cyan',
+    '아쿠아': 'aqua',
+    '파랑': 'blue', '파란색': 'blue',
+    '남색': 'navy', '네이비': 'navy',
+    '보라': 'purple', '보라색': 'purple',
+    '자주': 'violet', '자주색': 'violet', '바이올렛': 'violet',
+    '마젠타': 'magenta',
+    '분홍': 'pink', '분홍색': 'pink',
+    '하양': 'white', '하얀색': 'white', '흰색': 'white',
+    '검정': 'black', '검정색': 'black', '검은색': 'black',
+    '회색': 'gray',
+    '금색': 'gold',
+    '하늘': 'skyblue', '하늘색': 'skyblue',
+    '토마토': 'tomato', '토마토색': 'tomato',
+    '산호': 'coral', '산호색': 'coral',
+    '틸': 'teal',
+    '갈색': 'brown',
+    '은색': 'silver'
+  };
+
   var TAG_RE = /\[(\/)?([A-Za-z0-9_\uAC00-\uD7A3]{1,12})(?:=([^\[\]\s]{1,24}))?\]/g;
   var EMOJI_RE = /\{:([A-Za-z0-9_]{1,40}):\}/g;
+
+  // 기본 태그 이름(영문, 단축, 한글) → 태그
+  var DEFAULT_ALIASES = {};
+  Object.keys(TAG_DEFS).forEach(function (canon) {
+    TAG_DEFS[canon].names.forEach(function (n) { DEFAULT_ALIASES[n] = canon; });
+  });
 
   function mergeLimits(limits) {
     var out = {};
@@ -61,6 +101,7 @@
     var a = arg.toLowerCase();
     if (/^#[0-9a-f]{3}$/.test(a) || /^#[0-9a-f]{6}$/.test(a)) return a;
     if (Object.prototype.hasOwnProperty.call(NAMED_COLORS, a)) return a;
+    if (Object.prototype.hasOwnProperty.call(COLOR_KO, a)) return COLOR_KO[a];
     return null;
   }
 
@@ -80,6 +121,14 @@
       if (arg == null) return null;
       var c2 = normalizeColor(arg); return c2 == null ? undefined : c2;
     }
+    if (def.arg === 'colors') {
+      if (arg == null) return undefined;
+      var parts = arg.split(',');
+      if (parts.length > 2) return undefined;
+      var cs = [];
+      for (var k = 0; k < parts.length; k++) { var ck = normalizeColor(parts[k]); if (ck == null) return undefined; cs.push(ck); }
+      return cs.join(',');
+    }
     if (def.arg === 'size') { var s = normalizeSize(arg, limits); return s == null ? undefined : s; }
     return undefined;
   }
@@ -98,7 +147,7 @@
    *  options.limits      : DEFAULT_LIMITS 일부를 덮어쓰기
    *  options.commands    : { "~감사": { src, alt, height } }  이 사용자가 쓸 수 있는 이미지 명령어
    *  options.emojis      : { id: url }  치지직이 이벤트에 넣어 준 이모티콘 정보
-   *  options.aliases     : { 쓰는이름: 태그이름 }  예: { "무지개": "rainbow" }. 없으면 기본 영문 이름만 사용
+   *  options.aliases     : { 쓰는이름: 태그이름 }  예: { "무지개": "rainbow" }. 없으면 TAG_DEFS의 기본 이름(영문, 단축, 한글)을 사용
    */
   function parse(input, options) {
     options = options || {};
@@ -110,7 +159,7 @@
     var aliasMap = options.aliases || null;
     function canonical(written) {
       if (aliasMap) return Object.prototype.hasOwnProperty.call(aliasMap, written) ? aliasMap[written] : null;
-      return Object.prototype.hasOwnProperty.call(TAG_DEFS, written) ? written : null;
+      return Object.prototype.hasOwnProperty.call(DEFAULT_ALIASES, written) ? DEFAULT_ALIASES[written] : null;
     }
 
     var rootNode = { type: 'root', children: [] };
@@ -130,21 +179,6 @@
       return n;
     }
     function addText(t) { if (t) realTop().children.push({ type: 'text', value: t }); }
-
-    // 닫히지 않은 태그를 "여는 태그 글자 + 자식들"로 풀어서 부모에 되돌려 놓습니다.
-    function flattenEntry(index) {
-      var node = stack[index].node;
-      if (!node) return;
-      var parent = rootNode;
-      for (var i = index - 1; i >= 0; i--) if (stack[i].node) { parent = stack[i].node; break; }
-      var pos = parent.children.indexOf(node);
-      if (pos >= 0) {
-        var replacement = [{ type: 'text', value: node.raw }].concat(node.children);
-        Array.prototype.splice.apply(parent.children, [pos, 1].concat(replacement));
-      }
-      if (TAG_DEFS[node.name] && TAG_DEFS[node.name].effect) effectCount--;
-      tagCount--;
-    }
 
     var last = 0;
     var m;
@@ -167,8 +201,7 @@
         }
         if (idx < 0) { addText(m[0]); continue; }
         var wasSkipped = !stack[idx].node;
-        for (var f = stack.length - 1; f > idx; f--) flattenEntry(f);
-        stack.length = idx; // 닫힌 태그(또는 자리표시)까지 제거
+        stack.length = idx; // 닫힌 태그(또는 자리표시)까지 제거. 안쪽에서 닫히지 않은 태그는 여기서 함께 끝납니다.
         if (wasSkipped) addText(m[0]); // 열리지 못한 태그의 짝이므로 글자로 남김
         continue;
       }
@@ -191,7 +224,7 @@
       if (def.effect) effectCount++;
     }
     addText(text.slice(last));
-    for (var r = stack.length - 1; r > 0; r--) flattenEntry(r);
+    // 끝까지 닫히지 않은 태그는 메시지 끝까지 적용됩니다.
 
     // 텍스트 노드 안에서 이모티콘과 이미지 명령어를 이미지 노드로 바꿉니다.
     var budget = { images: limits.maxImages };
@@ -291,12 +324,26 @@
   /** 트리를 DOM 조각으로. 모든 값은 textContent / 검증된 속성으로만 들어갑니다. */
   function toDOM(nodes, doc) {
     var frag = doc.createDocumentFragment();
-    nodes.forEach(function (n) { frag.appendChild(build(n, doc)); });
+    nodes.forEach(function (n) { frag.appendChild(build(n, doc, null)); });
     return frag;
   }
 
-  function build(n, doc) {
-    if (n.type === 'text') return doc.createTextNode(n.value);
+  // 글자마다 따로 움직이는 태그: 글자를 하나씩 span으로 나눕니다. (물결, 타자기)
+  var PER_CHAR = { wave: 0.09, type: 0.08 };
+
+  function build(n, doc, ctx) {
+    if (n.type === 'text') {
+      if (!ctx) return doc.createTextNode(n.value);
+      var frag = doc.createDocumentFragment();
+      Array.from(n.value).forEach(function (ch) {
+        var c = doc.createElement('span');
+        c.className = 'bb-c';
+        c.style.animationDelay = (ctx.i++ * ctx.step).toFixed(2) + 's';
+        c.textContent = ch;
+        frag.appendChild(c);
+      });
+      return frag;
+    }
     if (n.type === 'image' || n.type === 'emoji') {
       var img = doc.createElement('img');
       img.className = n.type === 'image' ? 'cmd-img' : 'cc-emoji';
@@ -312,6 +359,13 @@
     if (n.name === 'color' && n.arg) el.style.color = n.arg;
     if (n.name === 'size' && n.arg) el.style.fontSize = n.arg + '%';
     if (n.name === 'glow') el.style.setProperty('--glow', n.arg || '#ffffff');
+    if (n.name === 'bg') el.style.backgroundColor = n.arg;
+    if (n.name === 'outline') el.style.setProperty('--ol', n.arg || '#000000');
+    if (n.name === 'grad') {
+      var cs = n.arg.split(',');
+      if (cs.length === 1) el.style.color = cs[0];
+      else { el.classList.add('bb-grad2'); el.style.setProperty('--g1', cs[0]); el.style.setProperty('--g2', cs[1]); }
+    }
     var target = el;
     if (n.name === 'marquee') {
       var inner = doc.createElement('span');
@@ -319,7 +373,13 @@
       el.appendChild(inner);
       target = inner;
     }
-    (n.children || []).forEach(function (c) { target.appendChild(build(c, doc)); });
+    var childCtx = ctx;
+    if (PER_CHAR[n.name]) {
+      var total = Array.from(toPlainText(n.children || [])).length || 1;
+      // 타자기는 길어도 3초 안에 끝나도록 글자 사이 간격을 줄입니다.
+      childCtx = { i: 0, step: n.name === 'type' ? Math.min(PER_CHAR.type, 3 / total) : PER_CHAR.wave };
+    }
+    (n.children || []).forEach(function (c) { target.appendChild(build(c, doc, childCtx)); });
     return el;
   }
 

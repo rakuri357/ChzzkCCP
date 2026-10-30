@@ -39,6 +39,23 @@ test('예전 형식(명령어 하나)의 설정은 새 형식으로 바뀌고, �
   assert.equal(c.version, L.CONFIG_VERSION);
 });
 
+test('기본값: 채팅은 10초 뒤에 사라지고, 명령어 이미지 기본 높이는 3em', () => {
+  const o = L.normalizeConfig(null).overlay;
+  assert.equal(o.lineLifetimeSec, 10);
+  assert.equal(o.imageHeight, '3em');
+  assert.equal(L.normalizeConfig({ overlay: { lineLifetimeSec: 0 } }).overlay.lineLifetimeSec, 0, '직접 0으로 정한 설정은 그대로');
+});
+
+test('기본 태그 이름: 영문, 단축, 한글이 처음부터 켜져 있다', () => {
+  const n = L.resolveTagNames({});
+  assert.deepEqual(n.names.rainbow, ['rainbow', 'rb', '무지개']);
+  assert.deepEqual(n.names.wave, ['wave', 'wv', '물결', '파도']);
+  assert.deepEqual(n.conflicts, []);
+  const c = L.normalizeConfig(null);
+  assert.deepEqual(c.bbcode.tags, {});
+  assert.equal(dom('[굵게]x[/굵게] [rb]y', {}).querySelector('.bb-b').textContent, 'x');
+});
+
 test('명령어 검사: 띄어쓰기/대괄호/중복/개수', () => {
   const t20 = Array.from({ length: 25 }, (_, i) => '~a' + i);
   const c = L.normalizeConfig({ commands: [
@@ -80,8 +97,9 @@ test('태그 이름 규칙: 이상한 이름은 버리고, 겹치면 앞 태그�
 });
 
 test('기본 상태의 태그는 설정에 흔적을 남기지 않는다', () => {
-  const c = L.normalizeConfig({ bbcode: { tags: { b: { names: ['b'] }, i: { enabled: true }, blink: { enabled: false } } } });
+  const c = L.normalizeConfig({ bbcode: { tags: { b: { names: ['b', '굵게'] }, i: { enabled: true }, blink: { enabled: false } } } });
   assert.deepEqual(c.bbcode.tags, { blink: { enabled: false } });
+  assert.deepEqual(L.normalizeConfig({ bbcode: { tags: { b: { names: ['b'] } } } }).bbcode.tags, { b: { names: ['b'] } }, '이름을 줄이면 설정에 남는다');
 });
 
 test('태그를 끄면 이름이 있어도 동작하지 않는다', () => {
@@ -135,7 +153,7 @@ test('명령어 이미지 기본 높이: 이미지마다 따로 정하지 않으
   ] };
   const d = L.derive(L.normalizeConfig(raw));
   assert.deepEqual(d.cmds.map((x) => x.height), ['3.2em', '60px', '2.4em']);
-  assert.equal(L.derive(L.normalizeConfig({ version: 3, commands: [{ triggers: ['~a'], image: 'a.png' }] })).cmds[0].height, '2.4em', '기본값의 기본값');
+  assert.equal(L.derive(L.normalizeConfig({ version: 3, commands: [{ triggers: ['~a'], image: 'a.png' }] })).cmds[0].height, '3em', '기본값의 기본값');
   const line = dom('~a', raw);
   assert.equal(line.querySelector('img.cmd-img').style.height, '3.2em', '오버레이에 기본 높이가 적용됨');
 });
@@ -143,7 +161,7 @@ test('명령어 이미지 기본 높이: 이미지마다 따로 정하지 않으
 test('높이 값 검사: 단위와 범위', () => {
   for (const ok of ['2.4em', '0.5em', '12em', '3rem', '8px', '400px', '60px']) assert.ok(L.validHeight(ok), ok);
   for (const bad of ['0.4em', '13em', '7px', '401px', 'abc', '60', '', '1px;x', '2.4 em', 'em']) assert.ok(!L.validHeight(bad), bad);
-  assert.equal(L.normalizeConfig({ overlay: { imageHeight: '999em' } }).overlay.imageHeight, '2.4em');
+  assert.equal(L.normalizeConfig({ overlay: { imageHeight: '999em' } }).overlay.imageHeight, '3em');
   assert.equal(L.normalizeConfig({ overlay: { imageHeight: '1.6em' } }).overlay.imageHeight, '1.6em');
 });
 
