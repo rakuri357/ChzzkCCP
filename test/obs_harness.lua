@@ -215,5 +215,56 @@ do
   check(count_exec(o, "taskkill") == 0, "리눅스에서는 taskkill을 쓰지 않는다")
 end
 
+-- 13) 한글 경로 대책: 한글 없는 고정 위치의 바로가기와 상태 파일 사본을 쓴다
+local function with_env(vars, fn)
+  local real = os.getenv
+  os.getenv = function(k) if vars[k] ~= nil then return vars[k] end return real(k) end
+  local ok, err = pcall(fn)
+  os.getenv = real
+  if not ok then error(err, 0) end
+end
+do
+  local bridge = "/tmp/obs-harness-bridge"
+  real_execute('rm -rf "' .. bridge .. '"'); mkdir(bridge)
+  with_env({ CHZZKCCP_BRIDGE_DIR = bridge, CHZZKCCP_ASCII_ONLY = "1" }, function()
+    -- 바로가기가 없으면: 한글 경로는 경고만 하고 실행하지 않는다
+    local hangul = "/tmp/새 폴더/ChzzkChatConPlus.exe"
+    local o0 = make_obs(); boot(o0, hangul)
+    check(#o0.executed == 0 and o0.logs[#o0.logs].level == 2 and o0.logs[#o0.logs].msg:find("한글", 1, true) ~= nil, "바로가기가 없으면 한글 경로는 한글 안내 경고만 남긴다")
+    local o00 = make_obs(); boot(o00, "")
+    check(#o00.executed == 0, "바로가기도 경로도 없으면 아무것도 실행하지 않는다")
+
+    -- 바로가기가 있으면: 한글 경로여도 바로가기로 실행, 상태는 사본에서 읽음
+    write(bridge .. "/launcher.lnk", "x")
+    local src = { id = "browser_source", url = "http://localhost:3939/output.html" }
+    local o = make_obs({ sources = { src } }); boot(o, hangul)
+    check(count_exec(o, "launcher.lnk") == 1 and count_exec(o, hangul) == 0, "한글 경로면 .exe 대신 고정 위치의 바로가기를 실행한다")
+    write(bridge .. "/runtime.json", string.format('{"app":"chzzkchatconplus","port":3939,"pid":4321,"startedAt":%d,"updatedAt":%d}', clock, clock))
+    tick(o, 1)
+    check(src.refreshed == 1, "고정 위치의 상태 파일 사본으로 준비된 것을 알아본다")
+    o.event_cb(obslua.OBS_FRONTEND_EVENT_EXIT)
+    check(count_exec(o, "127.0.0.1:3939/api/quit") == 1, "OBS를 끌 때 사본에 적힌 포트로 종료 요청을 보낸다")
+
+    -- 경로를 비워 두어도 바로가기가 있으면 시작한다
+    local o2 = make_obs(); load_script(o2); script_load({})
+    script_update(settings_for("", true))
+    o2.event_cb(obslua.OBS_FRONTEND_EVENT_FINISHED_LOADING)
+    check(count_exec(o2, "launcher.lnk") == 0, "이미 실행 중(사본이 최근)이면 다시 실행하지 않는다")
+    real_execute('rm -f "' .. bridge .. '/runtime.json"')
+    local o3 = make_obs(); boot(o3, "")
+    check(count_exec(o3, "launcher.lnk") == 1, "경로를 비워 두어도 바로가기가 있으면 시작한다")
+
+    -- 한글 없는 .exe 경로가 있으면 그것을 우선한다
+    local dir, exe = new_env()
+    local o4 = make_obs(); boot(o4, exe)
+    check(count_exec(o4, exe) == 1 and count_exec(o4, "launcher.lnk") == 0, "한글 없는 .exe 경로는 바로가기보다 우선한다")
+  end)
+  -- 윈도우가 아닌 환경(기본값)에서는 한글 경로도 그대로 쓴다
+  local dirk = "/tmp/obs-harness-한글"
+  real_execute('rm -rf "' .. dirk .. '"'); mkdir(dirk .. "/chzzkchatconplus-data"); write(dirk .. "/ChzzkChatConPlus.exe", "x")
+  local o5 = make_obs(); boot(o5, dirk .. "/ChzzkChatConPlus.exe")
+  check(count_exec(o5, "--hidden") == 1 and count_exec(o5, dirk) == 1, "윈도우가 아니면 한글 경로의 .exe도 그대로 실행한다")
+end
+
 print(failures == 0 and "ALL OK" or ("FAILURES: " .. failures))
 os.exit(failures == 0 and 0 or 1)

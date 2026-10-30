@@ -37,6 +37,26 @@ function pickDataDir() {
   }
 }
 
+// OBS 스크립트(Lua)는 윈도우에서 한글이 들어간 경로를 열지 못합니다. 그래서 한글 없는 고정 위치(ProgramData 아래)에
+// 이 앱을 숨김으로 여는 바로가기와 실행 상태 파일 사본을 두고, 스크립트는 그쪽만 봅니다. (윈도우의 설치본에서만)
+function bridgeDir() {
+  if (process.platform !== 'win32' || !app.isPackaged) return null;
+  return path.join(process.env.ProgramData || 'C:\\ProgramData', APP.BRIDGE_DIR);
+}
+
+function writeLauncher(dir) {
+  if (!dir) return;
+  try {
+    const target = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath; // 포터블은 압축을 푼 임시 위치가 아니라 원래 .exe
+    fs.mkdirSync(dir, { recursive: true });
+    shell.writeShortcutLink(path.join(dir, APP.LAUNCHER), 'create', {
+      target, args: '--hidden', cwd: path.dirname(target), description: APP.NAME, icon: target, iconIndex: 0
+    });
+  } catch (e) {
+    console.warn('[launcher] OBS용 바로가기를 만들지 못했습니다:', e.message); // 없어도 앱은 동작합니다. (OBS 스크립트에 .exe를 직접 지정하면 됩니다.)
+  }
+}
+
 function isOurPage(url) {
   return !!running && typeof url === 'string' && url.startsWith(running.url);
 }
@@ -101,11 +121,14 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
     try {
+      const bridge = bridgeDir();
       running = await startServer({
         dataDir: pickDataDir(),
+        mirrorDir: bridge,
         openFolder: (dir) => shell.openPath(dir),
         onQuit: quitApp
       });
+      writeLauncher(bridge);
       setupPermissions();
       createTray();
       if (!startHidden) showWindow();

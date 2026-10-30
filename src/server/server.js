@@ -240,12 +240,22 @@ async function startServer(options = {}) {
   hub.apply(store.config); // 저장된 채널이 있으면 바로 접속 시작
 
   // 실행 상태 파일: 5초마다 갱신해서, OBS 스크립트가 "지금 켜져 있는지"를 파일만 읽고 알 수 있게 함
+  // mirrorDir이 있으면 같은 파일을 그곳에도 씁니다. (OBS의 Lua는 한글 경로의 파일을 열 수 없어서, 한글 없는 고정 위치에도 둡니다.)
   const runtimeFile = path.join(store.dataDir, 'runtime.json');
+  const mirrorFile = options.mirrorDir ? path.join(options.mirrorDir, 'runtime.json') : null;
   const startedAt = Math.floor(Date.now() / 1000);
   function writeRuntime() {
-    try {
-      fs.writeFileSync(runtimeFile, JSON.stringify({ app: APP.ID, port: actualPort, pid: process.pid, startedAt, updatedAt: Math.floor(Date.now() / 1000) }));
-    } catch { /* 쓸 수 없으면 건너뜀 */ }
+    const text = JSON.stringify({ app: APP.ID, port: actualPort, pid: process.pid, startedAt, updatedAt: Math.floor(Date.now() / 1000) });
+    try { fs.writeFileSync(runtimeFile, text); } catch { /* 쓸 수 없으면 건너뜀 */ }
+    if (mirrorFile) {
+      try { fs.mkdirSync(options.mirrorDir, { recursive: true }); fs.writeFileSync(mirrorFile, text); } catch { /* 쓸 수 없으면 건너뜀 */ }
+    }
+  }
+  function removeMirror() {
+    if (!mirrorFile) return;
+    try { // 다른 앱이 덮어쓴 파일은 지우지 않습니다.
+      if (JSON.parse(fs.readFileSync(mirrorFile, 'utf8')).pid === process.pid) fs.unlinkSync(mirrorFile);
+    } catch { /* 이미 없음 */ }
   }
   writeRuntime();
   const runtimeTimer = setInterval(writeRuntime, 5000);
@@ -257,6 +267,7 @@ async function startServer(options = {}) {
     close: async () => {
       clearInterval(runtimeTimer);
       try { fs.unlinkSync(runtimeFile); } catch { /* 이미 없음 */ }
+      removeMirror();
       hub.stop();
       for (const ws of clients) ws.terminate();
       const closed = new Promise((r) => server.close(r));

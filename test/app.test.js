@@ -193,6 +193,25 @@ test('OBS 연동: 실행 상태 파일(runtime.json)과 종료 요청', async (t
   assert.ok(!fs.existsSync(path.join(dir, 'runtime.json')), '종료하면 상태 파일은 지워짐');
 });
 
+test('OBS 연동: mirrorDir이 있으면 한글 없는 고정 위치에도 상태 파일 사본을 쓰고, 종료하면 지운다', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'app8-'));
+  const mirror = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'app8m-')), 'bridge');
+  const app = await startServer({ dataDir: dir, port: 0, mirrorDir: mirror });
+  t.after(() => app.close());
+  const a = JSON.parse(fs.readFileSync(path.join(dir, 'runtime.json'), 'utf8'));
+  const b = JSON.parse(fs.readFileSync(path.join(mirror, 'runtime.json'), 'utf8'));
+  assert.deepEqual(b, a);
+  assert.equal(b.port, app.port);
+  await app.close();
+  assert.ok(!fs.existsSync(path.join(mirror, 'runtime.json')), '종료하면 사본도 지워짐');
+
+  // 다른 앱이 덮어쓴 사본은 지우지 않는다
+  const app2 = await startServer({ dataDir: dir, port: 0, mirrorDir: mirror });
+  fs.writeFileSync(path.join(mirror, 'runtime.json'), JSON.stringify({ app: 'chzzkchatconplus', port: 1, pid: -1, startedAt: 1, updatedAt: 1 }));
+  await app2.close();
+  assert.ok(fs.existsSync(path.join(mirror, 'runtime.json')));
+});
+
 test('태그: 태그를 지정해 올리면 폴더가 생기고, 목록과 화면 주소에 반영된다', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tag1-'));
   const app = await startServer({ dataDir: dir, port: 0 });
