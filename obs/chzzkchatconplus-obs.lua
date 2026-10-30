@@ -220,9 +220,9 @@ local function quit_app()
   quit_done = true
   local cmd
   if SEP == "\\" then
-    cmd = 'curl.exe -s -m 3 -X POST -H "X-Requested-With: app" http://127.0.0.1:' .. rt.port .. '/api/quit >NUL 2>&1'
+    cmd = 'curl.exe -s -m 2 --connect-timeout 1 -X POST -H "X-Requested-With: app" http://127.0.0.1:' .. rt.port .. '/api/quit >NUL 2>&1'
   else
-    cmd = 'curl -s -m 3 -X POST -H "X-Requested-With: app" http://127.0.0.1:' .. rt.port .. '/api/quit >/dev/null 2>&1'
+    cmd = 'curl -s -m 2 --connect-timeout 1 -X POST -H "X-Requested-With: app" http://127.0.0.1:' .. rt.port .. '/api/quit >/dev/null 2>&1'
   end
   local result = os.execute(cmd)
   local ok = (result == 0) or (result == true)

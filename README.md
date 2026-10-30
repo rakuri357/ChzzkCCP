@@ -32,6 +32,7 @@
 
 1. [**Releases**](../../releases/latest)에서 `ChzzkChatConPlus-버전-portable.exe`를 받아 원하는 폴더에 두고 더블클릭합니다.
    - "Windows에서 PC를 보호했습니다"가 뜨면 **추가 정보 → 실행**을 누릅니다. 코드 서명이 없는 프로그램에 뜨는 일반적인 경고입니다.
+   - 켜지는 데 오래 걸리면(포터블 `.exe`는 켤 때마다 압축을 풉니다) Releases의 `ChzzkChatConPlus-버전-win-unpacked.zip`을 받아 폴더째 풀고, 그 안의 `ChzzkChatConPlus.exe`를 실행하십시오. 더 빨리 켜집니다.
 2. 설정 창에서 **내 채널 페이지 주소**(`https://chzzk.naver.com/…`)를 붙여 넣습니다.
 3. **이미지 추가**로 이미지를 넣습니다. (명령어가 자동으로 등록됩니다.)
 4. OBS에서 소스 `+` → 브라우저 → URL에 설정 창에 표시된 주소(보통 `http://localhost:3939/output.html`)를 넣습니다.

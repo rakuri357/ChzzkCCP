@@ -1,6 +1,6 @@
 {
   "name": "chzzkchatconplus",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "ChzzkChatConPlus - 치지직 채팅의 명령어를 이미지로, BBCode를 꾸민 글자로 바꿔 OBS에 보여 주는 오버레이",
   "main": "src/main/index.js",
   "author": "ChzzkChatConPlus contributors",
@@ -38,6 +38,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "signAndEditExecutable": false,
@@ -45,6 +51,10 @@
     },
     "portable": {
       "artifactName": "ChzzkChatConPlus-${version}-portable.exe"
-    }
+    },
+    "electronLanguages": [
+      "ko",
+      "en-US"
+    ]
   }
 }

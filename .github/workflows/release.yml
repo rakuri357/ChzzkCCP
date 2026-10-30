@@ -61,6 +61,18 @@ jobs:
           cp dist/ChzzkChatConPlus-*-portable.exe release/
           cp obs/chzzkchatconplus-obs.lua release/
           cp docs/USAGE-ko.txt release/
+
+      # 폴더형(압축을 푼 상태): 켤 때마다 임시 폴더에 푸는 단계가 없어서 시작이 빠릅니다.
+      - name: 폴더형 zip 만들기
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          Copy-Item dist/win-unpacked dist/ChzzkChatConPlus -Recurse
+          Compress-Archive -Path dist/ChzzkChatConPlus -DestinationPath "release/ChzzkChatConPlus-$v-win-unpacked.zip"
+
+      - name: 확인용 해시 만들기
+        shell: bash
+        run: |
           (cd release && sha256sum * > SHA256SUMS.txt)
           ls -la release
 

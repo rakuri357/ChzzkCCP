@@ -11,6 +11,8 @@ const APP = require('../server/app-info');
 
 const ASSETS = path.join(__dirname, '..', '..', 'assets');
 const startHidden = process.argv.includes('--hidden');
+// 숨김 실행(OBS용)은 화면을 거의 그리지 않으므로 GPU 가속을 끄면 시작이 빨라지고 메모리도 덜 씁니다. (app ready 전에 불러야 합니다.)
+if (startHidden) app.disableHardwareAcceleration();
 
 let win = null;
 let tray = null;
@@ -70,11 +72,18 @@ function setupPermissions() {
   ses.setPermissionCheckHandler((wc, permission, requestingOrigin) => permission === 'local-fonts' && isOurPage(requestingOrigin));
 }
 
-async function createWindow() {
+const LOADING_PAGE = 'data:text/html;charset=utf-8,' + encodeURIComponent(
+  '<!doctype html><meta charset="utf-8"><title>' + APP.NAME + '</title>' +
+  '<body style="margin:0;height:100vh;display:grid;place-items:center;background:#f5f6fb;color:#4a56e2;font:600 20px system-ui,sans-serif">' +
+  APP.NAME + ' 시작하는 중…</body>');
+
+// 서버가 준비되기 전에 창부터 띄웁니다. (실제 화면은 서버가 준비된 뒤에 불러옵니다.)
+function openWindow() {
   win = new BrowserWindow({
     width: 1180, height: 860, minWidth: 760, minHeight: 560,
     title: APP.NAME,
     icon: path.join(ASSETS, 'icon.png'),
+    backgroundColor: '#f5f6fb',
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false }
   });
@@ -83,6 +92,11 @@ async function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { if (!isOurPage(url)) { e.preventDefault(); if (/^https?:\/\//.test(url)) shell.openExternal(url); } });
   win.on('closed', () => { win = null; });
+  return win;
+}
+
+async function createWindow() {
+  openWindow();
   await win.loadURL(running.url + '/input.html');
 }
 
@@ -120,6 +134,7 @@ if (!gotLock) {
 
   app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
+    if (!startHidden) { openWindow(); win.loadURL(LOADING_PAGE).catch(() => {}); }
     try {
       const bridge = bridgeDir();
       running = await startServer({
@@ -131,7 +146,10 @@ if (!gotLock) {
       writeLauncher(bridge);
       setupPermissions();
       createTray();
-      if (!startHidden) showWindow();
+      if (!startHidden) {
+        if (win) await win.loadURL(running.url + '/input.html'); // 먼저 띄워 둔 창에 실제 화면을 불러옵니다.
+        else showWindow();
+      }
     } catch (e) {
       dialog.showErrorBox('시작하지 못했습니다', String((e && e.message) || e));
       app.quit();

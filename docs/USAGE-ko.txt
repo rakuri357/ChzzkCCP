@@ -13,6 +13,8 @@ ChzzkChatConPlus 사용법
 1) ChzzkChatConPlus-버전-portable.exe 를 원하는 폴더에 두고 더블클릭하십시오.
    - "Windows에서 PC를 보호했습니다"가 뜨면 [추가 정보] → [실행]을 누르십시오.
      (서명 없이 배포되는 프로그램에 뜨는 일반적인 경고이며, 한 번 허용하면 다시 뜨지 않습니다.)
+   - 켜지는 데 오래 걸리면 ChzzkChatConPlus-버전-win-unpacked.zip 을 받아 폴더째 풀고,
+     그 안의 ChzzkChatConPlus.exe 를 실행하십시오. (포터블 .exe는 켤 때마다 압축을 풀어서 느립니다.)
 
 2) 설정 창이 열립니다. 위에서부터 채우십시오. 바꾼 내용은 자동으로 저장됩니다.
    1. OBS에 넣기 : 표시된 주소를 복사하십시오. (아래 "OBS 설정" 참고)
