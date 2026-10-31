@@ -167,18 +167,23 @@ summary { cursor: pointer; font-weight: 700; color: var(--muted); font-size: 14p
 /* BBCode: 한 줄에 태그 하나 */
 .tags2 { border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; margin-top: 8px; }
 .tags2.off { opacity: .55; }
-.tagrow2 { display: grid; grid-template-columns: 178px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.tagrow2 { display: grid; grid-template-columns: 178px 160px minmax(0, 1fr); gap: 2px 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
 .tagrow2:first-child { border-top: 0; }
-.tagrow2.dim .tagex { opacity: .5; }
+.tagrow2.dim .tagsample { opacity: .5; }
+.tagrow2 .chips.compact { flex-wrap: wrap; min-width: 0; }
+/* 샘플 글자: 방송 화면처럼 어두운 바탕 위에 보여 줍니다. 마우스를 올린 줄만 움직입니다. */
+.tagsample { width: 150px; min-height: 30px; padding: 2px 10px; border-radius: 8px; background: #1b1d2a; color: #fff; font-size: 17px; font-weight: 700; line-height: 1.5; white-space: nowrap; overflow: hidden; }
+.tagsample:not(.play) .bb, .tagsample:not(.play) .bb-c, .tagsample:not(.play) .bb-marquee-inner { animation: none !important; }
+.tagsample:not(.play) .bb-type .bb-c { opacity: 1; }
+.tagsample:not(.play) .bb-marquee-inner { padding-left: 0; }
 .tagrow2 .msg { grid-column: 1 / -1; margin: 0 0 2px; }
 .tagrow2 .msg[hidden] { display: none; }
-.tagex { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none; color: var(--muted); padding: 0; }
 .chips.compact { flex: none; min-width: 0; border: 0; background: none; padding: 0; min-height: 0; justify-content: flex-end; cursor: default; }
 .chips.compact .chipin { min-width: 120px; flex: none; width: 140px; border: 1px solid var(--line); border-radius: 8px; }
 .chips.compact .chipin[hidden] { display: none; }
 .chipadd { padding: 0 8px; min-width: 28px; height: 26px; font-size: 14px; line-height: 1; border-radius: 999px; font-weight: 700; color: var(--accent); }
 .chipadd[hidden] { display: none; }
-@media (max-width: 760px) { .tagrow2 { grid-template-columns: 1fr auto; } .tagex { grid-column: 1 / -1; order: 3; } }
+@media (max-width: 760px) { .tagrow2 { grid-template-columns: 1fr; } .tagrow2 .chips.compact { justify-content: flex-start; } }
 
 .imgcountrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
 .imgcountrow .imgcount { margin: 0; }

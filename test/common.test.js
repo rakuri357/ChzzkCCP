@@ -49,7 +49,9 @@ test('기본값: 채팅은 10초 뒤에 사라지고, 명령어 이미지 기본
 test('기본 태그 이름: 영문, 단축, 한글이 처음부터 켜져 있다', () => {
   const n = L.resolveTagNames({});
   assert.deepEqual(n.names.rainbow, ['rainbow', 'rb', '무지개']);
-  assert.deepEqual(n.names.wave, ['wave', 'wv', '물결', '파도']);
+  assert.deepEqual(n.names.wave, ['wave', 'wv', '물결', '파도', '출렁']);
+  assert.deepEqual(n.names.glow, ['glow', 'gl', '반짝', '빛']);
+  assert.deepEqual(n.names.shine, ['shine', 'sh', '광택', '윤', '광']);
   assert.deepEqual(n.conflicts, []);
   const c = L.normalizeConfig(null);
   assert.deepEqual(c.bbcode.tags, {});
@@ -210,11 +212,13 @@ test('권한 판단: 모두 / 구독자만 / 운영진만', () => {
 
 test('권한 설정 정리: 알려진 값만 저장하고, 기본은 모두 허용', () => {
   const d = L.normalizeConfig(null);
-  assert.deepEqual(d.permissions, { imageAccess: 'all', tagAccess: 'all' });
+  assert.deepEqual(d.permissions, { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide' });
+  assert.equal(L.normalizeConfig({ permissions: { deniedMode: 'show' } }).permissions.deniedMode, 'show');
+  assert.equal(L.normalizeConfig({ permissions: { deniedMode: 'zzz' } }).permissions.deniedMode, 'hide');
   const c = L.normalizeConfig({ permissions: { imageAccess: 'subscribers', tagAccess: 'hack' },
     commands: [{ triggers: ['~a'], image: 'a.png', access: 'staff' }, { triggers: ['~b'], image: 'b.png', access: 'zzz' }, { triggers: ['~c'], image: 'c.png' }],
     bbcode: { tags: { rainbow: { access: 'subscribers' }, b: { access: 'nope' } } } });
-  assert.deepEqual(c.permissions, { imageAccess: 'subscribers', tagAccess: 'all' });
+  assert.deepEqual(c.permissions, { imageAccess: 'subscribers', tagAccess: 'all', deniedMode: 'hide' });
   assert.deepEqual(c.commands.map((x) => x.access), ['staff', '', '']);
   assert.deepEqual(c.bbcode.tags, { rainbow: { access: 'subscribers' } });
 });
@@ -230,12 +234,14 @@ test('권한: 채팅콘은 권한이 없는 사람에게는 이미지로 바뀌�
   assert.deepEqual(imgs(subEv), ['images/a.png', 'images/b.png']);
   assert.deepEqual(imgs(staffEv), ['images/a.png', 'images/b.png', 'images/c.png']);
   assert.deepEqual(imgs(streamerEv), ['images/a.png', 'images/b.png', 'images/c.png']);
-  assert.equal(line(text, cfg, viewerEv).querySelector('.msg').textContent, ' ~구독 ~운영', '권한 없는 명령어는 글자로 남음');
+  assert.equal(line(text, cfg, viewerEv).querySelector('.msg').textContent, '  ~운영', '구독자 전용은 지우고, 운영진 전용은 글자 그대로 남음');
+  const show = Object.assign({}, cfg, { permissions: { imageAccess: 'all', deniedMode: 'show' } });
+  assert.equal(line(text, show, viewerEv).querySelector('.msg').textContent, ' ~구독 ~운영', '"글자 그대로" 설정이면 모두 남음');
 });
 
 test('권한: 기본 권한을 바꾸면 따로 정하지 않은 명령어가 모두 따라간다', () => {
   const cfg = { permissions: { imageAccess: 'subscribers' }, commands: [{ triggers: ['~a'], image: 'a.png' }, { triggers: ['~b'], image: 'b.png', access: 'all' }] };
-  assert.equal(line('~a', cfg, viewerEv).querySelectorAll('img.cmd-img').length, 0);
+  assert.equal(line('~a', cfg, viewerEv), null, '구독자 전용이 되면 일반 시청자의 명령어만 쓴 채팅은 숨겨진다');
   assert.equal(line('~a', cfg, subEv).querySelectorAll('img.cmd-img').length, 1);
   assert.equal(line('~b', cfg, viewerEv).querySelectorAll('img.cmd-img').length, 1, '따로 정한 "모두"가 기본 권한보다 우선');
 });
@@ -247,13 +253,39 @@ test('권한: BBCode 태그도 같은 방식 (한글 이름으로 불러도 권�
   assert.ok(!has('[rainbow]x[/rainbow]', viewerEv, '.bb-rainbow') && has('[rainbow]x[/rainbow]', subEv, '.bb-rainbow'));
   assert.ok(!has('[무지개]x[/무지개]', viewerEv, '.bb-rainbow') && has('[무지개]x[/무지개]', subEv, '.bb-rainbow'), '한글 이름도 같은 권한');
   assert.ok(!has('[blink]x[/blink]', subEv, '.bb-blink') && has('[blink]x[/blink]', staffEv, '.bb-blink'));
-  // 권한이 없으면 태그 글자가 그대로 보임
-  assert.equal(line('[rainbow]x[/rainbow]', cfg, viewerEv).querySelector('.msg').textContent, '[rainbow]x[/rainbow]');
+  // 구독자 전용 태그는 태그 글자만 지우고 안의 글자는 남김, 운영진 전용 태그는 쓴 글자 그대로
+  assert.equal(line('[rainbow]x[/rainbow]', cfg, viewerEv).querySelector('.msg').textContent, 'x');
+  assert.equal(line('[blink]x[/blink]', cfg, subEv).querySelector('.msg').textContent, '[blink]x[/blink]');
+  const show = Object.assign({}, cfg, { permissions: { tagAccess: 'all', deniedMode: 'show' } });
+  assert.equal(line('[rainbow]x[/rainbow]', show, viewerEv).querySelector('.msg').textContent, '[rainbow]x[/rainbow]');
 });
 
 test('권한: 구독 정보가 없는 채팅(읽지 못한 경우 포함)은 구독자 전용 기능을 쓸 수 없다', () => {
   const cfg = { commands: [{ triggers: ['~구독'], image: 'b.png', access: 'subscribers' }] };
   for (const ev of [{ role: 'common_user' }, { role: 'common_user', subscriber: null }, { role: 'common_user', subscriber: undefined }]) {
-    assert.equal(line('~구독', cfg, ev).querySelectorAll('img.cmd-img').length, 0);
+    assert.equal(line('~구독', cfg, ev), null, '남는 글이 없으면 줄 전체를 숨긴다');
+    assert.equal(line('~구독 안녕', cfg, ev).querySelectorAll('img.cmd-img').length, 0);
+    assert.equal(line('~구독 안녕', cfg, ev).querySelector('.msg').textContent, ' 안녕');
   }
+});
+
+test('권한 없는 부분 숨기기: 꺼 둔 태그와 운영진 전용 태그는 글자 그대로, 모르는 글자는 건드리지 않는다', () => {
+  const cfg = { bbcode: { tags: { blink: { enabled: false }, shake: { access: 'staff' }, rainbow: { access: 'subscribers' } } } };
+  const text = (t, ev) => line(t, cfg, ev).querySelector('.msg').textContent;
+  assert.equal(text('[blink]a[/blink]', viewerEv), '[blink]a[/blink]', '꺼 둔 태그');
+  assert.equal(text('[shake]a[/shake]', viewerEv), '[shake]a[/shake]', '운영진 전용');
+  assert.equal(text('[rainbow]a[/rainbow] [1] [ㅋㅋ]', viewerEv), 'a [1] [ㅋㅋ]', '구독자 전용만 지움');
+  assert.equal(text('[rb]a', viewerEv), 'a', '단축 이름도 같은 권한');
+  assert.equal(text('[b]안녕[rainbow]반가워[/rainbow][/b]', viewerEv), '안녕반가워');
+  assert.ok(line('[b]안녕[rainbow]반가워[/rainbow][/b]', cfg, viewerEv).querySelector('.bb-b'), '허용된 태그는 그대로 적용');
+  assert.equal(line('[rainbow]', cfg, viewerEv), null, '태그만 쓰면 줄 전체를 숨김');
+  assert.equal(line('  ', cfg, viewerEv).querySelector('.msg').textContent, '  ', '원래 빈 글은 건드리지 않음');
+  assert.ok(line('[rainbow]a[/rainbow]', cfg, subEv).querySelector('.bb-rainbow'), '구독자는 그대로 사용');
+  assert.ok(line('[rainbow]a[/rainbow]', cfg, streamerEv).querySelector('.bb-rainbow'), '스트리머는 그대로 사용');
+});
+
+test('권한 없는 부분 숨기기: 이미지만 남아도 줄은 남는다', () => {
+  const cfg = { commands: [{ triggers: ['~모두'], image: 'a.png' }, { triggers: ['~구독'], image: 'b.png', access: 'subscribers' }] };
+  const l = line('~구독 ~모두', cfg, viewerEv);
+  assert.ok(l && l.querySelectorAll('img.cmd-img').length === 1);
 });

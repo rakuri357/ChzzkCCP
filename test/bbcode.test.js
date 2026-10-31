@@ -291,3 +291,85 @@ test('태그 순서: 정적인 태그가 위, 움직이는 태그가 아래', ()
   assert.ok(defs.slice(0, firstMoving).every((d) => !d.effect));
   assert.ok(defs.slice(firstMoving).every((d) => d.effect));
 });
+
+// ---------- 태그 36개와 이름, 글자별 효과, 권한 없는 부분 숨기기 ----------
+const fs = require('fs');
+const path = require('path');
+
+test('태그는 36개이고, 이름(영문, 단축, 한글)은 서로 겹치지 않는다', () => {
+  const names = {};
+  for (const [canon, def] of Object.entries(BB.TAG_DEFS)) {
+    assert.ok(def.names.length >= 2 && def.names.length <= 6, canon);
+    for (const n of def.names) { assert.ok(/^[A-Za-z0-9_가-힣]{1,12}$/.test(n), n); assert.ok(!(n in names), n + ' 중복'); names[n] = canon; }
+  }
+  assert.equal(Object.keys(BB.TAG_DEFS).length, 36);
+});
+
+test('추가한 한글 이름도 같은 태그로 동작한다 ([빛], [윤], [출렁], [두근] 등)', () => {
+  const cases = { 빛: 'glow', 테두리: 'outline', 그라데이션: 'grad', 반짝반짝: 'twinkle', 윤: 'shine', 광: 'shine', 휴: 'hue', 불: 'fire', 글리치: 'glitch', 추: 'swing', 빙글: 'spin', 출렁: 'wave', 바운스: 'bounce', 두근: 'beat', 타닥: 'type', 마퀴: 'marquee' };
+  for (const [name, canon] of Object.entries(cases)) {
+    const arg = canon === 'grad' ? '=red,blue' : '';
+    assert.ok(dom('[' + name + arg + ']x[/' + name + ']').querySelector('.bb-' + canon), name);
+  }
+  assert.ok(dom('[반짝]x[/반짝]').querySelector('.bb-glow'), '예전 이름도 그대로');
+  assert.ok(dom('[물결]x[/물결]').querySelector('.bb-wave'), '예전 이름도 그대로');
+  assert.ok(dom('[두근두근]x').querySelector('.bb-beat') === null, '태그 표시 이름은 태그 이름이 아니다');
+});
+
+test('새 태그가 모두 요소로 바뀌고 움직이는 효과 한도에 걸린다', () => {
+  for (const canon of Object.keys(BB.TAG_DEFS)) {
+    const def = BB.TAG_DEFS[canon];
+    const arg = def.arg === 'color' ? '=red' : def.arg === 'colors' ? '=red,blue' : def.arg === 'size' ? '=150' : '';
+    const box = dom('[' + canon + arg + ']글자[/' + canon + ']');
+    assert.ok(box.querySelector('.bb-' + canon), canon);
+    assert.equal(box.textContent, '글자', canon);
+  }
+  const moving = Object.keys(BB.TAG_DEFS).filter((c) => BB.TAG_DEFS[c].effect);
+  assert.equal(moving.length, 26);
+  const many = dom(moving.slice(0, 5).map((c) => '[' + c + ']x[/' + c + ']').join(''));
+  assert.equal(many.querySelectorAll('.bb').length, 3, '움직이는 효과는 기본 3개까지');
+});
+
+test('네온은 색을 정할 수 있고 생략하면 기본 색이 들어간다', () => {
+  assert.equal(dom('[neon=blue]x').querySelector('.bb-neon').style.getPropertyValue('--c'), 'blue');
+  assert.equal(dom('[nn]x').querySelector('.bb-neon').style.getPropertyValue('--c'), '#ff2bd6');
+  assert.equal(dom('[nn=zzz]x').querySelector('.bb-neon'), null, '틀린 색은 글자 그대로');
+});
+
+test('글자마다 움직이는 효과: 통통, 젤리, 파티는 순서대로, 별빛은 무작위로 시작한다', () => {
+  for (const canon of ['bounce', 'jelly', 'party']) {
+    const cs = [...dom('[' + canon + ']abcd[/' + canon + ']').querySelectorAll('.bb-' + canon + ' .bb-c')];
+    assert.deepEqual(cs.map((c) => c.textContent), ['a', 'b', 'c', 'd'], canon);
+    const delays = cs.map((c) => parseFloat(c.style.animationDelay));
+    assert.ok(delays.every((d, i) => i === 0 || d > delays[i - 1]), canon + ' 순서대로');
+  }
+  const tw = [...dom('[twinkle]' + 'a'.repeat(30) + '[/twinkle]').querySelectorAll('.bb-twinkle .bb-c')];
+  assert.equal(tw.length, 30);
+  assert.ok(new Set(tw.map((c) => c.style.animationDelay)).size > 5, '시작 시간이 글자마다 다르다');
+  assert.ok(tw.every((c) => parseFloat(c.style.animationDuration) >= 1.8 && parseFloat(c.style.animationDuration) <= 3.4));
+});
+
+test('스타일: 움직이는 태그와 꾸미는 태그마다 bbcode.css에 모양이 있다', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'lib', 'bbcode.css'), 'utf8');
+  for (const [canon, def] of Object.entries(BB.TAG_DEFS)) {
+    if (def.effect || ['b', 'i', 'u', 's', 'glow', 'bg', 'outline', 'grad'].includes(canon)) assert.ok(css.includes('.bb-' + canon), canon + ' 스타일 없음');
+  }
+});
+
+test('권한 없는 태그 숨기기(deniedTags): 태그 글자만 지우고 안의 글자는 남긴다', () => {
+  const nodes = BB.parse('[rainbow]안녕[/rainbow] [rb]반가워', { allowedTags: ['b'], deniedTags: ['rainbow'] });
+  assert.equal(BB.toPlainText(nodes), '안녕 반가워');
+  assert.equal(nodes.stripped, 3);
+  assert.equal(BB.parse('[b]x[/b]', { allowedTags: ['b'], deniedTags: [] }).stripped, 0);
+  assert.equal(BB.toPlainText(BB.parse('[blink]x[/blink]', { allowedTags: ['b'], deniedTags: ['rainbow'] })), '[blink]x[/blink]', '허용도 거절도 아닌 태그는 글자 그대로');
+});
+
+test('권한 없는 명령어 숨기기: 글자만 지우고 이미지 개수는 쓰지 않는다', () => {
+  const cmds = { '~모두': { src: '/images/a.png' }, '~구독': { denied: true } };
+  const nodes = BB.parse('~구독 ~구독 ~모두 ~모두', { commands: cmds, limits: { maxImages: 2 } });
+  assert.equal(nodes.stripped, 2);
+  assert.equal(nodes.filter((n) => n.type === 'image').length, 2);
+  assert.equal(BB.isBlank(BB.parse('~구독 ', { commands: cmds })), true);
+  assert.equal(BB.isBlank(BB.parse('~구독 ~모두', { commands: cmds })), false);
+  assert.equal(BB.isBlank(BB.parse('안녕', {})), false);
+});

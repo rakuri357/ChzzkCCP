@@ -12,26 +12,44 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  /** 지원하는 태그 목록. 관리 페이지와 목록 페이지의 설명도 여기서 가져갑니다. 순서가 화면에 보이는 순서이므로 정적인 태그를 위에, 움직이는 태그를 아래에 둡니다. */
+  /** 지원하는 태그 목록. 관리 페이지와 목록 페이지의 설명도 여기서 가져갑니다. 순서가 화면에 보이는 순서입니다. 정적인 태그를 위에, 움직이는 태그를 아래에 두고, 비슷한 효과끼리 붙여 둡니다. */
   var TAG_DEFS = {
-    b:       { label: '굵게',       arg: 'none',     effect: false, names: ['b', '굵게'],                     example: '[b]굵게[/b]' },
-    i:       { label: '기울임',     arg: 'none',     effect: false, names: ['i', '기울'],                     example: '[i]기울임[/i]' },
-    u:       { label: '밑줄',       arg: 'none',     effect: false, names: ['u', '밑줄'],                     example: '[u]밑줄[/u]' },
-    s:       { label: '취소선',     arg: 'none',     effect: false, names: ['s', '취소'],                     example: '[s]취소선[/s]' },
-    color:   { label: '글자 색',    arg: 'color',    effect: false, names: ['color', 'cl', '색'],             example: '[color=#ff5577]색칠[/color]' },
-    size:    { label: '글자 크기',  arg: 'size',     effect: false, names: ['size', 'sz', '크기'],            example: '[size=150]크게[/size]' },
-    glow:    { label: '빛나는 글자', arg: 'color?',   effect: false, names: ['glow', 'gl', '반짝'],            example: '[glow=#ffd400]반짝[/glow]' },
-    bg:      { label: '배경색',     arg: 'color',    effect: false, names: ['bg', '배경'],                    example: '[bg=yellow]형광펜[/bg]' },
-    outline: { label: '테두리',     arg: 'color?',   effect: false, names: ['outline', 'ol', '외곽'],         example: '[outline=red]테두리[/outline]' },
-    grad:    { label: '그라데이션', arg: 'colors',   effect: false, names: ['grad', 'gr', '그라'],            example: '[grad=red,blue]그라데이션[/grad]' },
-    blink:   { label: '깜빡임',     arg: 'none',     effect: true,  names: ['blink', 'bl', '깜빡'],           example: '[blink]깜빡[/blink]' },
-    rainbow: { label: '무지개',     arg: 'none',     effect: true,  names: ['rainbow', 'rb', '무지개'],       example: '[rainbow]무지개[/rainbow]' },
-    shake:   { label: '흔들림',     arg: 'none',     effect: true,  names: ['shake', 'sk', '흔들'],           example: '[shake]덜덜[/shake]' },
-    marquee: { label: '흐르는 글자', arg: 'none',     effect: true,  names: ['marquee', 'mq', '흐름'],         example: '[marquee]흘러가요[/marquee]' },
-    wave:    { label: '물결',       arg: 'none',     effect: true,  names: ['wave', 'wv', '물결', '파도'],    example: '[wave]출렁출렁[/wave]' },
-    type:    { label: '타자기',     arg: 'none',     effect: true,  names: ['type', 'ty', '타자'],            example: '[type]타닥타닥[/type]' },
-    spin:    { label: '회전',       arg: 'none',     effect: true,  names: ['spin', 'sp', '회전'],            example: '[spin]빙글빙글[/spin]' },
-    pulse:   { label: '두근두근',   arg: 'none',     effect: true,  names: ['pulse', 'pl', '맥박', '펄스'],   example: '[pulse]두근[/pulse]' }
+    b       : { label: '굵게', arg: 'none', effect: false, names: ['b', '굵게'], example: '[b]굵게[/b]' },
+    i       : { label: '기울임', arg: 'none', effect: false, names: ['i', '기울'], example: '[i]기울임[/i]' },
+    u       : { label: '밑줄', arg: 'none', effect: false, names: ['u', '밑줄'], example: '[u]밑줄[/u]' },
+    s       : { label: '취소선', arg: 'none', effect: false, names: ['s', '취소'], example: '[s]취소선[/s]' },
+    color   : { label: '글자 색', arg: 'color', effect: false, names: ['color', 'cl', '색'], example: '[color=#ff5577]색칠[/color]' },
+    size    : { label: '글자 크기', arg: 'size', effect: false, names: ['size', 'sz', '크기'], example: '[size=150]크게[/size]' },
+    glow    : { label: '빛나는 글자', arg: 'color?', effect: false, names: ['glow', 'gl', '반짝', '빛'], example: '[glow=#ffd400]반짝[/glow]' },
+    bg      : { label: '배경색', arg: 'color', effect: false, names: ['bg', '배경'], example: '[bg=yellow]형광펜[/bg]' },
+    outline : { label: '테두리', arg: 'color?', effect: false, names: ['outline', 'ol', '외곽', '테두리'], example: '[outline=red]테두리[/outline]' },
+    grad    : { label: '그라데이션', arg: 'colors', effect: false, names: ['grad', 'gr', '그라', '그라데이션'], example: '[grad=red,blue]그라데이션[/grad]' },
+    blink   : { label: '깜빡임', arg: 'none', effect: true, names: ['blink', 'bl', '깜빡'], example: '[blink]깜빡[/blink]' },
+    neon    : { label: '네온', arg: 'color?', effect: true, names: ['neon', 'nn', '네온'], example: '[neon=pink]네온사인[/neon]' },
+    zap     : { label: '번개', arg: 'none', effect: true, names: ['zap', 'zp', '번개'], example: '[zap]찌릿찌릿[/zap]' },
+    siren   : { label: '사이렌', arg: 'none', effect: true, names: ['siren', 'sr', '사이렌'], example: '[siren]긴급 공지[/siren]' },
+    twinkle : { label: '별빛', arg: 'none', effect: true, names: ['twinkle', 'tw', '별빛', '반짝반짝'], example: '[twinkle]반짝반짝 별빛[/twinkle]' },
+    shine   : { label: '광택', arg: 'none', effect: true, names: ['shine', 'sh', '광택', '윤', '광'], example: '[shine]황금 광택[/shine]' },
+    scan    : { label: '스캔', arg: 'none', effect: true, names: ['scan', 'sn', '스캔'], example: '[scan]스캔 중[/scan]' },
+    rainbow : { label: '무지개', arg: 'none', effect: true, names: ['rainbow', 'rb', '무지개'], example: '[rainbow]무지개[/rainbow]' },
+    aurora  : { label: '오로라', arg: 'none', effect: true, names: ['aurora', 'au', '오로라'], example: '[aurora]오로라가 흐른다[/aurora]' },
+    party   : { label: '파티', arg: 'none', effect: true, names: ['party', 'pt', '파티'], example: '[party]축하합니다[/party]' },
+    hue     : { label: '색변환', arg: 'none', effect: true, names: ['hue', 'hu', '색변환', '휴'], example: '[hue]색이 변한다[/hue]' },
+    fire    : { label: '불꽃', arg: 'none', effect: true, names: ['fire', 'fr', '불꽃', '불'], example: '[fire]활활 타오른다[/fire]' },
+    ice     : { label: '얼음', arg: 'none', effect: true, names: ['ice', 'ic', '얼음'], example: '[ice]차가운 서리[/ice]' },
+    shake   : { label: '흔들림', arg: 'none', effect: true, names: ['shake', 'sk', '흔들'], example: '[shake]덜덜[/shake]' },
+    glitch  : { label: '글리치', arg: 'none', effect: true, names: ['glitch', 'gt', '지직', '글리치'], example: '[glitch]지직 오류 발생[/glitch]' },
+    swing   : { label: '시계추', arg: 'none', effect: true, names: ['swing', 'sw', '시계추', '추'], example: '[swing]좌우로 흔들[/swing]' },
+    spin    : { label: '회전', arg: 'none', effect: true, names: ['spin', 'sp', '회전', '빙글'], example: '[spin]빙글빙글[/spin]' },
+    wave    : { label: '물결', arg: 'none', effect: true, names: ['wave', 'wv', '물결', '파도', '출렁'], example: '[wave]출렁출렁[/wave]' },
+    bounce  : { label: '통통', arg: 'none', effect: true, names: ['bounce', 'bn', '통통', '바운스'], example: '[bounce]통통 튄다[/bounce]' },
+    float   : { label: '둥실', arg: 'none', effect: true, names: ['float', 'ft', '둥실'], example: '[float]둥실둥실[/float]' },
+    jelly   : { label: '젤리', arg: 'none', effect: true, names: ['jelly', 'jl', '젤리'], example: '[jelly]말랑말랑[/jelly]' },
+    stretch : { label: '고무줄', arg: 'none', effect: true, names: ['stretch', 'sc', '고무줄'], example: '[stretch]쭈우욱[/stretch]' },
+    pulse   : { label: '두근두근', arg: 'none', effect: true, names: ['pulse', 'pl', '맥박', '펄스'], example: '[pulse]두근[/pulse]' },
+    beat    : { label: '심장박동', arg: 'none', effect: true, names: ['beat', 'bt', '심장', '두근'], example: '[beat]두근두근[/beat]' },
+    type    : { label: '타자기', arg: 'none', effect: true, names: ['type', 'ty', '타자', '타닥'], example: '[type]타닥타닥[/type]' },
+    marquee : { label: '흐르는 글자', arg: 'none', effect: true, names: ['marquee', 'mq', '흐름', '마퀴'], example: '[marquee]흘러간다[/marquee]' }
   };
 
   var DEFAULT_LIMITS = {
@@ -147,6 +165,7 @@
    *  options.limits      : DEFAULT_LIMITS 일부를 덮어쓰기
    *  options.commands    : { "~감사": { src, alt, height } }  이 사용자가 쓸 수 있는 채팅콘 명령어
    *  options.emojis      : { id: url }  치지직이 이벤트에 넣어 준 이모티콘 정보
+   *  options.deniedTags  : 권한이 없어서 "그 부분만 숨길" 태그 이름 배열. (여는 태그와 닫는 태그 글자를 지우고 안의 글자는 남깁니다.)
    *  options.aliases     : { 쓰는이름: 태그이름 }  예: { "무지개": "rainbow" }. 없으면 TAG_DEFS의 기본 이름(영문, 단축, 한글)을 사용
    */
   function parse(input, options) {
@@ -156,6 +175,8 @@
     var text = String(input == null ? '' : input);
     if (text.length > limits.maxLength) text = text.slice(0, limits.maxLength);
 
+    var denied = options.deniedTags ? new Set(options.deniedTags) : null;
+    var stripped = 0;
     var aliasMap = options.aliases || null;
     function canonical(written) {
       if (aliasMap) return Object.prototype.hasOwnProperty.call(aliasMap, written) ? aliasMap[written] : null;
@@ -190,6 +211,7 @@
       var closing = !!m[1];
       var name = canonical(m[2].toLowerCase());
       var def = name && Object.prototype.hasOwnProperty.call(TAG_DEFS, name) ? TAG_DEFS[name] : null;
+      if (def && denied && denied.has(name)) { stripped++; continue; } // 권한이 없는 태그: 태그 글자만 지웁니다.
       var usable = !!def && (allowed === null || allowed.has(name));
 
       if (closing) {
@@ -227,9 +249,11 @@
     // 끝까지 닫히지 않은 태그는 메시지 끝까지 적용됩니다.
 
     // 텍스트 노드 안에서 이모티콘과 채팅콘 명령어를 이미지 노드로 바꿉니다.
-    var budget = { images: limits.maxImages };
+    var budget = { images: limits.maxImages, stripped: 0 };
     expandInline(rootNode, options.commands || {}, options.emojis || {}, budget);
-    return rootNode.children;
+    var result = rootNode.children;
+    result.stripped = stripped + budget.stripped; // 권한이 없어서 지운 태그와 명령어의 수
+    return result;
   }
 
   function isSafeSrc(src) {
@@ -266,10 +290,10 @@
         var next = null;
         if (nextEmoji && (!nextCmd || nextEmoji.index <= nextCmd.index)) next = nextEmoji;
         else if (nextCmd) next = nextCmd;
-        if (!next || budget.images <= 0) { parts.push({ type: 'text', value: value.slice(pos) }); break; }
+        if (!next || (budget.images <= 0 && next.node.type !== 'removed')) { parts.push({ type: 'text', value: value.slice(pos) }); break; }
         if (next.index > pos) parts.push({ type: 'text', value: value.slice(pos, next.index) });
-        parts.push(next.node);
-        budget.images--;
+        if (next.node.type === 'removed') budget.stripped++; // 권한이 없는 명령어: 글자만 지웁니다.
+        else { parts.push(next.node); budget.images--; }
         pos = next.index + next.length;
       }
       return parts;
@@ -294,6 +318,7 @@
       var m;
       while ((m = cmdRe.exec(value)) !== null) {
         var cmd = commands[m[0]];
+        if (cmd && cmd.denied) return { index: m.index, length: m[0].length, node: { type: 'removed' } };
         if (cmd && isSafeSrc(cmd.src)) {
           return {
             index: m.index, length: m[0].length,
@@ -317,6 +342,15 @@
     return out;
   }
 
+  /** 보여 줄 내용이 없는지 (공백뿐이고 이미지도 없는지). 권한 때문에 글자를 지운 뒤 줄 전체를 숨길지 정할 때 씁니다. */
+  function isBlank(nodes) {
+    return nodes.every(function (n) {
+      if (n.type === 'text') return !/\S/.test(n.value);
+      if (n.type === 'image' || n.type === 'emoji') return false;
+      return n.children ? isBlank(n.children) : true;
+    });
+  }
+
   function safeHeight(h) {
     return typeof h === 'string' && /^\d{1,3}(\.\d{1,2})?(em|rem|px)$/.test(h) ? h : null;
   }
@@ -328,8 +362,10 @@
     return frag;
   }
 
-  // 글자마다 따로 움직이는 태그: 글자를 하나씩 span으로 나눕니다. (물결, 타자기)
-  var PER_CHAR = { wave: 0.09, type: 0.08 };
+  // 글자마다 따로 움직이는 태그: 글자를 하나씩 span으로 나눕니다. step은 글자 사이 시작 시간 차이(초), random이면 글자마다 무작위
+  var PER_CHAR = {
+    wave: { step: 0.09 }, type: { step: 0.08 }, bounce: { step: 0.07 }, jelly: { step: 0.08 }, party: { step: 0.1 }, twinkle: { random: true }
+  };
 
   function build(n, doc, ctx) {
     if (n.type === 'text') {
@@ -338,7 +374,12 @@
       Array.from(n.value).forEach(function (ch) {
         var c = doc.createElement('span');
         c.className = 'bb-c';
-        c.style.animationDelay = (ctx.i++ * ctx.step).toFixed(2) + 's';
+        if (ctx.random) {
+          c.style.animationDelay = (Math.random() * 2.4).toFixed(2) + 's';
+          c.style.animationDuration = (1.8 + Math.random() * 1.6).toFixed(2) + 's';
+        } else {
+          c.style.animationDelay = (ctx.i++ * ctx.step).toFixed(2) + 's';
+        }
         c.textContent = ch;
         frag.appendChild(c);
       });
@@ -359,6 +400,7 @@
     if (n.name === 'color' && n.arg) el.style.color = n.arg;
     if (n.name === 'size' && n.arg) el.style.fontSize = n.arg + '%';
     if (n.name === 'glow') el.style.setProperty('--glow', n.arg || '#ffffff');
+    if (n.name === 'neon') el.style.setProperty('--c', n.arg || '#ff2bd6');
     if (n.name === 'bg') el.style.backgroundColor = n.arg;
     if (n.name === 'outline') el.style.setProperty('--ol', n.arg || '#000000');
     if (n.name === 'grad') {
@@ -377,7 +419,7 @@
     if (PER_CHAR[n.name]) {
       var total = Array.from(toPlainText(n.children || [])).length || 1;
       // 타자기는 길어도 3초 안에 끝나도록 글자 사이 간격을 줄입니다.
-      childCtx = { i: 0, step: n.name === 'type' ? Math.min(PER_CHAR.type, 3 / total) : PER_CHAR.wave };
+      childCtx = { i: 0, random: !!PER_CHAR[n.name].random, step: n.name === 'type' ? Math.min(PER_CHAR.type.step, 3 / total) : PER_CHAR[n.name].step };
     }
     (n.children || []).forEach(function (c) { target.appendChild(build(c, doc, childCtx)); });
     return el;
@@ -395,6 +437,7 @@
     toDOM: toDOM,
     render: render,
     toPlainText: toPlainText,
+    isBlank: isBlank,
     normalizeColor: normalizeColor
   };
 });

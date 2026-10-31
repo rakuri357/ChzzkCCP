@@ -18,6 +18,7 @@
   var MAX_TAG_NAMES = 6;
   var MAX_TRIGGERS_PER_IMAGE = 20;
   var SECTION_KEYS = ['obs', 'channel', 'images', 'bbcode', 'hidden', 'permissions', 'style'];
+  var DENIED_MODES = ['hide', 'show'];             // 구독자 전용 기능을 권한 없이 썼을 때: 그 부분만 숨기기 / 쓴 글자 그대로 보이기
   var ACCESS = ['all', 'subscribers', 'staff'];   // 모두(일반 시청자+구독자) / 구독자만 / 스트리머와 운영진만(사용 불가)
   var STAFF_ROLES = ['streamer', 'streaming_channel_manager', 'streaming_chat_manager', 'manager'];
   var IMAGE_SORTS = ['name', 'tag', 'recent', 'nocmd'];
@@ -68,7 +69,7 @@
       },
       advanced: { apiBase: '', commApiBase: '', wsUrl: '' },
       // 일반 시청자/구독자가 쓸 수 있는 기능. 기능마다 따로 정하지 않으면 이 기본 권한을 따릅니다. (스트리머와 운영진은 항상 모두 쓸 수 있습니다.)
-      permissions: { imageAccess: 'all', tagAccess: 'all' },
+      permissions: { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide' },
       ui: { collapsed: {}, imageSort: 'name', autoCommand: true }
     };
   }
@@ -276,7 +277,8 @@
       },
       permissions: {
         imageAccess: ACCESS.indexOf(perm.imageAccess) >= 0 ? perm.imageAccess : 'all',
-        tagAccess: ACCESS.indexOf(perm.tagAccess) >= 0 ? perm.tagAccess : 'all'
+        tagAccess: ACCESS.indexOf(perm.tagAccess) >= 0 ? perm.tagAccess : 'all',
+        deniedMode: DENIED_MODES.indexOf(perm.deniedMode) >= 0 ? perm.deniedMode : 'hide'
       },
       ui: { collapsed: collapsed, imageSort: IMAGE_SORTS.indexOf(ui.imageSort) >= 0 ? ui.imageSort : 'name', autoCommand: bool(ui.autoCommand, true) }
     };
@@ -317,7 +319,7 @@
       tagAccess[canon] = (cfg.bbcode.tags[canon] && cfg.bbcode.tags[canon].access) || cfg.permissions.tagAccess;
       names[canon].forEach(function (n) { aliases[n] = canon; });
     });
-    return { cmds: cmds, tags: tags, tagAccess: tagAccess, aliases: aliases, limits: cfg.bbcode.limits, hiddenCommands: cfg.hidden.commands, hiddenPrefixes: cfg.hidden.prefixes };
+    return { cmds: cmds, tags: tags, tagAccess: tagAccess, aliases: aliases, deniedMode: cfg.permissions.deniedMode, limits: cfg.bbcode.limits, hiddenCommands: cfg.hidden.commands, hiddenPrefixes: cfg.hidden.prefixes };
   }
 
   function isHidden(text, d) {
@@ -342,7 +344,7 @@
     return 'hsl(' + (h % 360) + ' 85% 74%)';
   }
 
-  /** 채팅 한 줄(DOM)을 만듭니다. ev = { nickname, role, userId, badges, titleColor, content, emojis } */
+  /** 채팅 한 줄(DOM)을 만듭니다. 권한 때문에 보여 줄 내용이 없어지면 null을 돌려줍니다. ev = { nickname, role, userId, badges, titleColor, content, emojis } */
   function renderLine(ev, d, doc) {
     var line = doc.createElement('div');
     line.className = 'line';
@@ -363,19 +365,31 @@
     nick.style.color = roleColor(ev);
     line.appendChild(nick);
 
+    // 권한이 없을 때: 구독자 전용 기능은 "그 부분만 숨기기"(기본) 또는 쓴 글자 그대로. 운영진 전용이나 꺼 둔 기능은 항상 글자 그대로 둡니다.
+    var hideDenied = d.deniedMode !== 'show';
     var cmds = {};
     var plain = String(ev.content || '').trim();
     d.cmds.forEach(function (c) {
       if (c.whole && plain !== c.trigger) return;
-      if (!allowedFor(c.access, ev)) return;   // 권한이 없으면 이미지로 바꾸지 않고 쓴 글자 그대로 둡니다.
+      if (!allowedFor(c.access, ev)) {
+        if (hideDenied && c.access === 'subscribers') cmds[c.trigger] = { denied: true };
+        return;
+      }
       cmds[c.trigger] = { src: c.src, alt: c.trigger, height: c.height };
     });
-    var tags = d.tags.filter(function (t) { return allowedFor(d.tagAccess[t], ev); });
+    var tags = [], deniedTags = [];
+    d.tags.forEach(function (t) {
+      if (allowedFor(d.tagAccess[t], ev)) tags.push(t);
+      else if (hideDenied && d.tagAccess[t] === 'subscribers') deniedTags.push(t);
+    });
+    var nodes = BB.parse(String(ev.content || ''), {
+      allowedTags: tags, deniedTags: deniedTags, aliases: d.aliases, limits: d.limits, commands: cmds, emojis: ev.emojis || {}
+    });
+    // 권한 때문에 글자를 지웠더니 보여 줄 내용이 남지 않으면 줄 전체를 숨깁니다.
+    if (nodes.stripped > 0 && BB.isBlank(nodes)) return null;
     var msg = doc.createElement('span');
     msg.className = 'msg';
-    msg.appendChild(BB.render(String(ev.content || ''), doc, {
-      allowedTags: tags, aliases: d.aliases, limits: d.limits, commands: cmds, emojis: ev.emojis || {}
-    }));
+    msg.appendChild(BB.toDOM(nodes, doc));
     line.appendChild(msg);
     return line;
   }
@@ -396,6 +410,7 @@
   return {
     IMAGE_FILE_RE: IMAGE_FILE_RE,
     ACCESS: ACCESS,
+    DENIED_MODES: DENIED_MODES,
     isStaff: isStaff,
     isSubscriber: isSubscriber,
     allowedFor: allowedFor,

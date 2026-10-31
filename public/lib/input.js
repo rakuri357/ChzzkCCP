@@ -134,6 +134,7 @@
     sec.sum.hidden = !collapsed;
     sec.arrow.textContent = collapsed ? '▸' : '▾';
     sec.head.setAttribute('aria-expanded', String(!collapsed));
+    if (key === 'bbcode' && !collapsed && S.fillBBSamples) S.fillBBSamples(); // 샘플은 펼쳤을 때만 그립니다.
   }
 
   function setCollapsed(key, on) {
@@ -688,6 +689,22 @@
     for (var i = 0; i < keys.length; i++) if (tagNames(keys[i]).indexOf(name) >= 0) return keys[i];
     return null;
   }
+  // 4번 패널의 샘플 글자: 이 태그의 첫 번째 이름으로 쓴 예시를 오버레이와 같은 코드로 그립니다.
+  function sampleMarkup(canon) {
+    var names = tagNames(canon);
+    if (!names.length) return '';
+    var ex = BB.TAG_DEFS[canon].example;
+    var arg = (/^\[\w+(=[^\]]*)?\]/.exec(ex) || [])[1] || '';
+    var text = (/\](.*?)\[\//.exec(ex) || [])[1] || BB.TAG_DEFS[canon].label;
+    return '[' + names[0] + arg + ']' + text + '[/' + names[0] + ']';
+  }
+  function drawSample(canon, el) {
+    el.textContent = '';
+    var markup = sampleMarkup(canon);
+    if (!markup) return;
+    var aliases = {}; aliases[tagNames(canon)[0]] = canon;
+    el.appendChild(BB.render(markup, document, { aliases: aliases, allowedTags: [canon], limits: { maxEffects: 20 } }));
+  }
   function tagExample(canon) {
     var names = tagNames(canon);
     var first = names[0];
@@ -717,10 +734,17 @@
       h('button', { type: 'button', class: 'small', text: '모두 켜기', onclick: function () { setAll(true); } }),
       h('button', { type: 'button', class: 'small', text: '모두 끄기', onclick: function () { setAll(false); } })));
 
+    var samples = [];
+    S.fillBBSamples = function () {
+      if (S.cfg.ui.collapsed.bbcode) return;
+      samples.forEach(function (x) { if (!x.drawn) { drawSample(x.canon, x.el); x.drawn = true; } });
+    };
     Object.keys(BB.TAG_DEFS).forEach(function (canon) {
       var def = BB.TAG_DEFS[canon];
       var on = !(tagEntry(canon) && tagEntry(canon).enabled === false);
-      var code = h('code', { class: 'tagex', text: tagExample(canon), title: tagExample(canon) });
+      var sample = h('span', { class: 'tagsample', title: tagExample(canon) }); // 마우스를 올리면 쓰는 모양(코드)이 툴팁으로 보입니다.
+      var entry = { canon: canon, el: sample, drawn: false };
+      samples.push(entry);
       var msg = h('p', { class: 'msg', hidden: true });
       var chips = chipInput({
         label: def.label + ' 태그 이름', placeholder: '이름 추가 (예: ' + (canon === 'rainbow' ? '무지개' : '한글 이름') + ')', collapsedInput: true,
@@ -740,18 +764,25 @@
           else if (!tagNames(canon).length) { msg.hidden = false; msg.className = 'msg warn'; msg.textContent = '이름이 없어서 이 태그는 쓸 수 없습니다. 이름을 하나 추가하십시오.'; }
           else msg.hidden = true;
         },
-        onChange: function () { code.textContent = tagExample(canon); code.title = tagExample(canon); changed(); }
+        onChange: function () { sample.title = tagExample(canon); if (entry.drawn) drawSample(canon, sample); changed(); }
       });
-      list.appendChild(h('div', { class: 'tagrow2' + (on ? '' : ' dim') },
+      var row = h('div', { class: 'tagrow2' + (on ? '' : ' dim') },
         check(def.label + (def.effect ? ' (움직임)' : ''), on, function (v) {
           var e = tagEntry(canon) || (S.cfg.bbcode.tags[canon] = {});
           if (v) delete e.enabled; else e.enabled = false;
           if (!Object.keys(e).length) delete S.cfg.bbcode.tags[canon];
           updateSummaries(); changed();
         }),
-        code, chips.el, msg));
+        sample, chips.el, msg);
+      // 움직이는 효과는 마우스를 올리거나 키보드로 이동한 줄만 움직입니다.
+      row.addEventListener('mouseenter', function () { sample.classList.add('play'); });
+      row.addEventListener('mouseleave', function () { sample.classList.remove('play'); });
+      row.addEventListener('focusin', function () { sample.classList.add('play'); });
+      row.addEventListener('focusout', function () { sample.classList.remove('play'); });
+      list.appendChild(row);
     });
     c.appendChild(list);
+    S.fillBBSamples();
     var L2 = bb.limits;
     function lim(label, key, min, max) { return field(label, num(L2[key], min, max, function (n) { L2[key] = n; changed(); }), 'small'); }
     c.appendChild(h('details', null, h('summary', { text: '남용 방지 한도 (보통은 그대로 두십시오)' }),
@@ -784,10 +815,20 @@
     return { viewer: h('label', { class: 'permcell', title: '일반 시청자' }, viewerCb), sub: h('label', { class: 'permcell', title: '구독자' }, subCb), repaint: paint };
   }
 
+  // 구독자 전용 기능을 권한 없이 썼을 때의 처리
+  function deniedModeField() {
+    var sel = h('select', { 'aria-label': '권한이 없는 시청자가 구독자 전용 기능을 썼을 때', onchange: function (e) { S.cfg.permissions.deniedMode = e.target.value; changed(); } },
+      h('option', { value: 'hide', text: '그 부분만 숨기기' }), h('option', { value: 'show', text: '쓴 글자 그대로 보이기' }));
+    sel.value = S.cfg.permissions.deniedMode === 'show' ? 'show' : 'hide';
+    sel.style.minWidth = '210px';
+    return h('div', { class: 'row', style: 'margin-top:8px' }, field('구독자 전용 기능을 권한 없이 쓴 경우', sel),
+      h('p', { class: 'msg muted', style: 'margin:0', text: '숨기면 그 명령어와 태그 글자만 사라지고 나머지 글은 남습니다. 남는 글이 없으면 채팅 한 줄이 통째로 숨겨집니다.' }));
+  }
+
   function renderPermissions() {
     var c = begin('s-permissions', 'permissions', '6. 권한');
     var perm = S.cfg.permissions;
-    c.appendChild(h('p', { class: 'lead', text: '일반 시청자와 구독자가 쓸 수 있는 채팅콘과 BBCode를 정합니다. 권한이 없으면 쓴 글자 그대로 나옵니다. 스트리머와 운영진은 항상 모두 쓸 수 있습니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '일반 시청자와 구독자가 쓸 수 있는 채팅콘과 BBCode를 정합니다. 스트리머와 운영진은 항상 모두 쓸 수 있습니다. 운영진 전용으로 정했거나 꺼 둔 기능을 쓰면 쓴 글자 그대로 나옵니다.' }));
 
     function head() {
       return h('div', { class: 'permhead' }, h('span', { text: '' }), h('span', { class: 'permcol', text: '일반 시청자' }), h('span', { class: 'permcol', text: '구독자' }), h('span', { text: '' }));
@@ -801,7 +842,8 @@
       head(),
       h('div', { class: 'permrow' }, h('span', { class: 'permname', text: '채팅콘' }), defImg.viewer, defImg.sub, h('span')),
       h('div', { class: 'permrow' }, h('span', { class: 'permname', text: 'BBCode' }), defTag.viewer, defTag.sub, h('span')),
-      h('p', { class: 'msg muted', style: 'margin:6px 0 0', text: '따로 정하지 않은 기능과 새로 추가하는 항목은 이 기본 권한을 따릅니다.' })));
+      h('p', { class: 'msg muted', style: 'margin:6px 0 0', text: '따로 정하지 않은 기능과 새로 추가하는 항목은 이 기본 권한을 따릅니다.' }),
+      deniedModeField()));
 
     c.appendChild(h('div', { id: 'permlists' }));
     c.appendChild(h('p', { class: 'msg muted', text: '구독자 여부는 치지직 채팅 정보로 판단합니다. 2번 패널의 최근 채팅에 [구독 N개월]이 보이는지 확인하십시오. 읽지 못하면 구독자 전용 기능은 운영진만 쓸 수 있습니다.' }));

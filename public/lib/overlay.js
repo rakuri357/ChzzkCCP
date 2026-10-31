@@ -55,6 +55,7 @@
   function addChat(ev) {
     if (Lite.isHidden(ev.content, derived)) return;
     var line = Lite.renderLine(ev, derived, document);
+    if (!line) return; // 권한 때문에 보여 줄 내용이 없는 채팅
     line._born = Date.now();
     chatEl.appendChild(line);
     trim();
