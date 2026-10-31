@@ -63,7 +63,7 @@
       hidden: { commands: [], prefixes: [] },
       bbcode: { enabled: true, tags: {}, limits: JSON.parse(JSON.stringify(BB.DEFAULT_LIMITS)), overflowMode: 'hide' }, // overflowMode: 한도를 넘은 부분을 숨길지(hide) 쓴 글자 그대로 둘지(show)
       overlay: {
-        maxLines: 14, fontSize: 24, lineLifetimeSec: 10, showBadges: true, showNickname: true, showStatus: true,
+        maxLines: 14, fontSize: 24, lineLifetimeSec: 10, fadeTopPx: 24, fadeTopOpacity: 50, showBadges: true, showNickname: true, showStatus: true,
         textColor: '#ffffff', outlineColor: '#000000', backgroundColor: 'rgba(0,0,0,0)', fontFamily: '',
         imageHeight: DEFAULT_IMAGE_HEIGHT   // 명령어 이미지의 기본 높이 (글자 크기 기준). 이미지마다 따로 정하지 않으면 이 값을 씁니다.
       },
@@ -290,6 +290,8 @@
         maxLines: Math.round(num(ov.maxLines, 1, 100, d.overlay.maxLines)),
         fontSize: Math.round(num(ov.fontSize, 10, 120, d.overlay.fontSize)),
         lineLifetimeSec: Math.round(num(ov.lineLifetimeSec, 0, 3600, d.overlay.lineLifetimeSec)),
+        fadeTopPx: Math.round(num(ov.fadeTopPx, 0, 400, d.overlay.fadeTopPx)),            // 채팅창 맨 위를 흐리게 하는 높이(px). 0이면 끔
+        fadeTopOpacity: Math.round(num(ov.fadeTopOpacity, 0, 100, d.overlay.fadeTopOpacity)), // 맨 위 가장자리가 얼마나 보일지(%)
         showBadges: bool(ov.showBadges, true),
         showNickname: bool(ov.showNickname, true),
         showStatus: bool(ov.showStatus, true),
@@ -431,6 +433,9 @@
     r.setProperty('--text', o.textColor);
     r.setProperty('--outline', o.outlineColor);
     r.setProperty('--bg', o.backgroundColor);
+    r.setProperty('--fade-h', o.fadeTopPx + 'px');
+    r.setProperty('--fade-min', String(o.fadeTopOpacity / 100));
+    doc.body.classList.toggle('no-fade', !(o.fadeTopPx > 0) || o.fadeTopOpacity >= 100);
     if (o.fontFamily) r.setProperty('--font', '"' + o.fontFamily + '", \'Malgun Gothic\', sans-serif');
     else r.removeProperty('--font');
     doc.body.classList.toggle('no-badges', !o.showBadges);

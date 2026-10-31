@@ -345,3 +345,30 @@ test('채팅콘 순서(order): 같은 태그 안의 올바른 이미지 경로�
   assert.equal(L.orderRank(c.order, '인사', '인사/없음.png'), 1e9, '정하지 않은 것은 뒤로');
   assert.equal(L.orderRank({}, '인사', '인사/a.png'), 1e9);
 });
+
+test('위쪽 흐림 설정: 기본 24px, 맨 위 선명도 50%, 범위를 벗어나면 한도 안으로, 0이면 끈다', () => {
+  const o = L.normalizeConfig(null).overlay;
+  assert.equal(o.fadeTopPx, 24);
+  assert.equal(o.fadeTopOpacity, 50);
+  const c = L.normalizeConfig({ overlay: { fadeTopPx: 99999, fadeTopOpacity: -5 } }).overlay;
+  assert.equal(c.fadeTopPx, 400);
+  assert.equal(c.fadeTopOpacity, 0);
+  assert.equal(L.normalizeConfig({ overlay: { fadeTopPx: 'x', fadeTopOpacity: 'y' } }).overlay.fadeTopPx, 24, '이상한 값은 기본값');
+  assert.equal(L.normalizeConfig({ overlay: { fadeTopPx: 0 } }).overlay.fadeTopPx, 0, '0은 그대로(끔)');
+});
+
+test('위쪽 흐림 적용: 화면 변수가 정해지고, 높이 0이거나 선명도 100%면 효과를 끈다', () => {
+  const apply = (ov) => {
+    const doc = new JSDOM('<body></body>').window.document;
+    L.applyStyle(L.normalizeConfig({ overlay: ov }).overlay, doc);
+    return { h: doc.documentElement.style.getPropertyValue('--fade-h'), m: doc.documentElement.style.getPropertyValue('--fade-min'), off: doc.body.classList.contains('no-fade') };
+  };
+  assert.deepEqual(apply({}), { h: '24px', m: '0.5', off: false });
+  assert.deepEqual(apply({ fadeTopPx: 60, fadeTopOpacity: 20 }), { h: '60px', m: '0.2', off: false });
+  assert.equal(apply({ fadeTopPx: 0 }).off, true);
+  assert.equal(apply({ fadeTopOpacity: 100 }).off, true);
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'lib', 'overlay.css'), 'utf8');
+  assert.ok(/#chat \{[^}]*mask-image: linear-gradient\(to bottom, rgba\(0, 0, 0, var\(--fade-min/.test(css), '채팅 영역에 위쪽 그라데이션 마스크');
+  assert.ok(/body\.no-fade #chat \{[^}]*mask-image: none/.test(css), '끄는 규칙');
+  assert.ok(!/#status[^{]*\{[^}]*mask/.test(css), '연결 안내 상자는 흐리게 하지 않는다');
+});

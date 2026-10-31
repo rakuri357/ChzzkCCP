@@ -1144,6 +1144,10 @@
       field('글자 크기(px)', num(o.fontSize, 10, 120, function (n) { o.fontSize = n; updateSummaries(); changed(); }), 'small'),
       field('최대 줄 수', num(o.maxLines, 1, 100, function (n) { o.maxLines = n; updateSummaries(); changed(); }), 'small'),
       field('채팅이 사라지는 시간(초, 0이면 사라지지 않음)', num(o.lineLifetimeSec, 0, 3600, function (n) { o.lineLifetimeSec = n; changed(); }))));
+    c.appendChild(h('div', { class: 'row' },
+      field('위쪽 흐림 높이(px, 0이면 끔)', num(o.fadeTopPx, 0, 400, function (n) { o.fadeTopPx = n; changed(); }), 'small'),
+      field('맨 위 선명도(%, 100이면 흐림 없음)', num(o.fadeTopOpacity, 0, 100, function (n) { o.fadeTopOpacity = n; changed(); }), 'small'),
+      h('p', { class: 'msg muted', style: 'margin:0;align-self:end', text: '채팅창 맨 위 가장자리를 약간 투명하게 해서 위로 올라가는 채팅이 자연스럽게 흐려집니다.' })));
     // 명령어 이미지의 기본 높이: 이미지마다 따로 정하지 않은 이미지는 모두 이 값을 따릅니다.
     var customCount = function () { return S.cfg.commands.filter(function (cm) { return cm.height; }).length; };
     var resetBtn = h('button', { type: 'button', class: 'small', onclick: function () {

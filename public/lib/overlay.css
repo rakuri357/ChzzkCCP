@@ -15,7 +15,11 @@ body.preview {
   display: flex; flex-direction: column; justify-content: flex-end;
   padding: 8px 12px; gap: 4px; overflow: hidden;
   background: var(--bg);
+  /* 맨 위 가장자리는 약간 투명하게 시작해서 아래로 내려오면서 또렷해집니다. */
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--fade-min, 0.5)) 0, #000 var(--fade-h, 24px));
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--fade-min, 0.5)) 0, #000 var(--fade-h, 24px));
 }
+body.no-fade #chat { -webkit-mask-image: none; mask-image: none; }
 .line {
   line-height: 1.35; word-break: break-word; overflow-wrap: anywhere;
   -webkit-text-stroke: 0.14em var(--outline);
