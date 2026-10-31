@@ -167,7 +167,7 @@
     return '';
   }
 
-  // ---------- 글자 꾸미기 태그 이름 ----------
+  // ---------- BBCode 태그 이름 ----------
   /**
    * 태그마다 쓸 수 있는 이름(예: rainbow → ["rainbow", "rb", "무지개"], 기본값은 TAG_DEFS의 names)을 정하고, 이름이 겹치면 TAG_DEFS 순서상 앞의 태그가 가져갑니다.
    * 반환: { names: { 태그: [이름…] }, conflicts: [{ name, tag, owner }] }

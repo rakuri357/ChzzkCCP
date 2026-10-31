@@ -94,7 +94,7 @@ summary { cursor: pointer; font-weight: 700; color: var(--muted); font-size: 14p
 .secbody { margin-top: 12px; }
 .secbody[hidden], .sum[hidden] { display: none; }
 
-/* 칩 입력 (이미지 명령어, 태그 이름) */
+/* 칩 입력 (채팅콘 명령어, 태그 이름) */
 .chips { flex: 1; min-width: 220px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: text; }
 .chips:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chiplist { display: contents; }
@@ -164,7 +164,7 @@ summary { cursor: pointer; font-weight: 700; color: var(--muted); font-size: 14p
 .imgsize .tagtext { font-size: 12px; }
 .imgbar select { width: auto; }
 
-/* 글자 꾸미기: 한 줄에 태그 하나 */
+/* BBCode: 한 줄에 태그 하나 */
 .tags2 { border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; margin-top: 8px; }
 .tags2.off { opacity: .55; }
 .tagrow2 { display: grid; grid-template-columns: 178px minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }

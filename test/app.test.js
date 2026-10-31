@@ -55,7 +55,7 @@ test('첫 실행은 빈 상태로 시작하고, 설정 저장, 치지직 접속�
   assert.ok(st0.urls.overlay.endsWith('/output.html'));
   assert.equal(st0.config.overlay.imageHeight, '3em');
   assert.equal(st0.config.ui.autoCommand, true);
-  // 이미지와 명령어는 사용자가 직접 추가
+  // 채팅콘은 사용자가 직접 추가
   await upload(app.port, '감사.png', '');
   st0.config.commands = [{ triggers: ['~감사'], image: '감사.png', height: '', match: 'anywhere' }];
 

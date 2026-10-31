@@ -61,15 +61,19 @@ jobs:
           cp dist/ChzzkChatConPlus-*-portable.exe release/
           cp obs/chzzkchatconplus-obs.lua release/
           cp docs/USAGE-ko.txt release/
+          # 폴더형(압축을 푼 상태): 켤 때마다 임시 폴더에 푸는 단계가 없어서 시작이 빠릅니다.
+          # OBS 스크립트, 사용법, 해시 파일을 같은 폴더에 넣어서 zip 하나만 받으면 되게 합니다.
+          cp -r dist/win-unpacked dist/ChzzkChatConPlus
+          cp obs/chzzkchatconplus-obs.lua docs/USAGE-ko.txt dist/ChzzkChatConPlus/
+          (cd dist/ChzzkChatConPlus && sha256sum ChzzkChatConPlus.exe chzzkchatconplus-obs.lua USAGE-ko.txt > SHA256SUMS.txt)
 
-      # 폴더형(압축을 푼 상태): 켤 때마다 임시 폴더에 푸는 단계가 없어서 시작이 빠릅니다.
       - name: 폴더형 zip 만들기
         shell: pwsh
         run: |
           $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          Copy-Item dist/win-unpacked dist/ChzzkChatConPlus -Recurse
-          Compress-Archive -Path dist/ChzzkChatConPlus -DestinationPath "release/ChzzkChatConPlus-$v-win-unpacked.zip"
+          Compress-Archive -Path dist/ChzzkChatConPlus -DestinationPath "release/ChzzkChatConPlus-$v-windows.zip"
 
+      # 바깥쪽 해시: 받은 zip과 포터블 exe가 올린 그대로인지 확인하는 용도입니다. (zip 안의 해시는 같이 들어 있는 파일의 손상 확인용)
       - name: 확인용 해시 만들기
         shell: bash
         run: |

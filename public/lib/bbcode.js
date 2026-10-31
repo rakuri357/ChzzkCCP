@@ -1,5 +1,5 @@
 /*
- * chat-markup (BBCode + 이미지 명령어 + 치지직 이모티콘)
+ * chat-markup (BBCode + 채팅콘 + 치지직 이모티콘)
  *
  * - 서버, OBS 오버레이, 목록 페이지, (나중에) 크롬 확장 프로그램이 같은 파일을 그대로 씁니다.
  * - 입력 문자열을 HTML로 바꾸지 않습니다. parse()가 안전한 트리(AST)를 만들고,
@@ -12,7 +12,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  /** 지원하는 태그 목록. 관리 페이지와 목록 페이지의 설명도 여기서 가져갑니다. */
+  /** 지원하는 태그 목록. 관리 페이지와 목록 페이지의 설명도 여기서 가져갑니다. 순서가 화면에 보이는 순서이므로 정적인 태그를 위에, 움직이는 태그를 아래에 둡니다. */
   var TAG_DEFS = {
     b:       { label: '굵게',       arg: 'none',     effect: false, names: ['b', '굵게'],                     example: '[b]굵게[/b]' },
     i:       { label: '기울임',     arg: 'none',     effect: false, names: ['i', '기울'],                     example: '[i]기울임[/i]' },
@@ -21,13 +21,13 @@
     color:   { label: '글자 색',    arg: 'color',    effect: false, names: ['color', 'cl', '색'],             example: '[color=#ff5577]색칠[/color]' },
     size:    { label: '글자 크기',  arg: 'size',     effect: false, names: ['size', 'sz', '크기'],            example: '[size=150]크게[/size]' },
     glow:    { label: '빛나는 글자', arg: 'color?',   effect: false, names: ['glow', 'gl', '반짝'],            example: '[glow=#ffd400]반짝[/glow]' },
+    bg:      { label: '배경색',     arg: 'color',    effect: false, names: ['bg', '배경'],                    example: '[bg=yellow]형광펜[/bg]' },
+    outline: { label: '테두리',     arg: 'color?',   effect: false, names: ['outline', 'ol', '외곽'],         example: '[outline=red]테두리[/outline]' },
+    grad:    { label: '그라데이션', arg: 'colors',   effect: false, names: ['grad', 'gr', '그라'],            example: '[grad=red,blue]그라데이션[/grad]' },
     blink:   { label: '깜빡임',     arg: 'none',     effect: true,  names: ['blink', 'bl', '깜빡'],           example: '[blink]깜빡[/blink]' },
     rainbow: { label: '무지개',     arg: 'none',     effect: true,  names: ['rainbow', 'rb', '무지개'],       example: '[rainbow]무지개[/rainbow]' },
     shake:   { label: '흔들림',     arg: 'none',     effect: true,  names: ['shake', 'sk', '흔들'],           example: '[shake]덜덜[/shake]' },
     marquee: { label: '흐르는 글자', arg: 'none',     effect: true,  names: ['marquee', 'mq', '흐름'],         example: '[marquee]흘러가요[/marquee]' },
-    bg:      { label: '배경색',     arg: 'color',    effect: false, names: ['bg', '배경'],                    example: '[bg=yellow]형광펜[/bg]' },
-    outline: { label: '테두리',     arg: 'color?',   effect: false, names: ['outline', 'ol', '외곽'],         example: '[outline=red]테두리[/outline]' },
-    grad:    { label: '그라데이션', arg: 'colors',   effect: false, names: ['grad', 'gr', '그라'],            example: '[grad=red,blue]그라데이션[/grad]' },
     wave:    { label: '물결',       arg: 'none',     effect: true,  names: ['wave', 'wv', '물결', '파도'],    example: '[wave]출렁출렁[/wave]' },
     type:    { label: '타자기',     arg: 'none',     effect: true,  names: ['type', 'ty', '타자'],            example: '[type]타닥타닥[/type]' },
     spin:    { label: '회전',       arg: 'none',     effect: true,  names: ['spin', 'sp', '회전'],            example: '[spin]빙글빙글[/spin]' },
@@ -145,7 +145,7 @@
    * parse(input, options)
    *  options.allowedTags : 허용할 태그 이름 배열/Set (없으면 전부)
    *  options.limits      : DEFAULT_LIMITS 일부를 덮어쓰기
-   *  options.commands    : { "~감사": { src, alt, height } }  이 사용자가 쓸 수 있는 이미지 명령어
+   *  options.commands    : { "~감사": { src, alt, height } }  이 사용자가 쓸 수 있는 채팅콘 명령어
    *  options.emojis      : { id: url }  치지직이 이벤트에 넣어 준 이모티콘 정보
    *  options.aliases     : { 쓰는이름: 태그이름 }  예: { "무지개": "rainbow" }. 없으면 TAG_DEFS의 기본 이름(영문, 단축, 한글)을 사용
    */
@@ -226,7 +226,7 @@
     addText(text.slice(last));
     // 끝까지 닫히지 않은 태그는 메시지 끝까지 적용됩니다.
 
-    // 텍스트 노드 안에서 이모티콘과 이미지 명령어를 이미지 노드로 바꿉니다.
+    // 텍스트 노드 안에서 이모티콘과 채팅콘 명령어를 이미지 노드로 바꿉니다.
     var budget = { images: limits.maxImages };
     expandInline(rootNode, options.commands || {}, options.emojis || {}, budget);
     return rootNode.children;

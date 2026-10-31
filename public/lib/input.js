@@ -183,7 +183,7 @@
     if (S.refreshPerms) S.refreshPerms();
   }
 
-  // ---------- 칩 입력 (이미지 명령어, 태그 이름 공용) ----------
+  // ---------- 칩 입력 (채팅콘, 태그 이름 공용) ----------
   // opts: values() → 현재 값 목록, add(v) → 오류 문장('' 이면 성공), remove(v), onError(문장), onChange(), placeholder, label
   function chipInput(opts) {
     var wrap = h('div', { class: 'chips' });
@@ -396,7 +396,7 @@
     toast(newTag ? '태그를 "' + newTag + '"(으)로 바꿨습니다' : '태그를 없앴습니다');
   }
 
-  // ---------- 화면: 3. 이미지와 명령어 ----------
+  // ---------- 화면: 3. 채팅콘 ----------
   function cmdOf(path) { for (var i = 0; i < S.cfg.commands.length; i++) if (S.cfg.commands[i].image === path) return S.cfg.commands[i]; return null; }
   function suggest(path) { return '~' + baseName(path).replace(/\.[^.]+$/, '').replace(/\s+/g, ''); }
 
@@ -614,9 +614,9 @@
   }
 
   function renderImages() {
-    var c = begin('s-images', 'images', '3. 이미지와 명령어');
+    var c = begin('s-images', 'images', '3. 채팅콘');
     S.imgFilter.sort = S.cfg.ui.imageSort || 'name';
-    c.appendChild(h('p', { class: 'lead', text: '이미지마다 명령어를 입력하면 채팅에서 그 글자가 이미지로 바뀝니다. 명령어는 여러 개 입력할 수 있고 (예: ~감사, ~땡큐), images 안의 폴더 이름은 태그가 됩니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '채팅콘마다 명령어를 입력하면 채팅에서 그 글자가 채팅콘으로 바뀝니다. 명령어는 여러 개 입력할 수 있고 (예: ~감사, ~땡큐), images 안의 폴더 이름은 태그가 됩니다.' }));
     var fileIn = h('input', { type: 'file', multiple: true, accept: '.png,.jpg,.jpeg,.gif,.webp,.svg,image/*', style: 'display:none',
       onchange: function (e) { addFiles(Array.prototype.slice.call(e.target.files)); e.target.value = ''; } });
     c.appendChild(h('div', { class: 'imgbar' },
@@ -639,6 +639,24 @@
       h('button', { type: 'button', class: 'small', text: '명령어 없는 이미지에 추천 명령어 붙이기', title: '지금 보이는 목록에서 명령어가 없는 이미지에, 파일 이름으로 만든 명령어(예: 식은땀.gif → ~식은땀)를 붙입니다.', onclick: applySuggestions })));
     c.appendChild(h('div', { class: 'imglist', id: 'imglist' }));
     renderAddTag(); renderTagBar(); renderImageList();
+    renderExport(c);
+  }
+
+  // 시청자용 명령어 페이지: 시청자가 쓸 수 있는 명령어와 BBCode 사용법을 웹페이지(폴더)로 만듭니다.
+  function renderExport(c) {
+    var msg = h('p', { class: 'msg muted', style: 'margin:6px 0 0' });
+    var btn = h('button', { type: 'button', text: '시청자용 명령어 페이지 내보내기', onclick: function () {
+      btn.disabled = true;
+      // 방금 바꾼 설정이 저장된 뒤에 내보냅니다.
+      (saveTimer ? save() : Promise.resolve()).then(function () { return api('POST', '/api/export-page', {}); }).then(function (r) {
+        msg.className = 'msg ok';
+        msg.textContent = '✓ 명령어 ' + r.commands + '개와 BBCode 태그 ' + r.tags + '개를 폴더로 만들었습니다. 폴더 안의 index.html을 열어 확인한 뒤, 폴더째 웹 호스팅에 올리십시오. (' + r.dir + ')';
+      }).catch(function (e) { msg.className = 'msg bad'; msg.textContent = e.message; })
+        .then(function () { btn.disabled = false; });
+    } });
+    c.appendChild(h('div', { class: 'imgbar', style: 'margin-top:14px' }, btn));
+    c.appendChild(h('p', { class: 'msg muted', style: 'margin:6px 0 0', text: '시청자가 쓸 수 있는 명령어와 BBCode 사용법만 담은 웹페이지입니다. 6번 패널의 권한을 따르고, 명령어가 없는 채팅콘은 빠집니다.' }));
+    c.appendChild(msg);
   }
 
   // ---------- 화면: 5. 숨길 채팅 ----------
@@ -655,7 +673,7 @@
       }))));
   }
 
-  // ---------- 화면: 4. 글자 꾸미기 ----------
+  // ---------- 화면: 4. BBCode ----------
   function tagEntry(canon) { return S.cfg.bbcode.tags[canon]; }
   function tagNames(canon) { var e = tagEntry(canon); return e && Array.isArray(e.names) ? e.names : BB.TAG_DEFS[canon].names; }
   // 이름을 바꾼 결과를 설정에 기록 (기본 상태로 돌아오면 흔적을 지움)
@@ -684,7 +702,7 @@
       bb.enabled = on; list.classList.toggle('off', !on); updateSummaries(); changed();
     });
     sw.classList.add('headswitch');
-    var c = begin('s-bbcode', 'bbcode', '4. 글자 꾸미기', sw);
+    var c = begin('s-bbcode', 'bbcode', '4. BBCode', sw);
     var list = h('div', { class: 'tags2' + (bb.enabled ? '' : ' off') });
     c.appendChild(h('p', { class: 'lead', text: '채팅에 [color=red]글자[/color]처럼 쓰면 방송 화면에서 꾸며집니다. 태그 이름은 바꿀 수 있고, 닫는 태그는 생략할 수 있습니다. (예: [색=빨강]글자)' }));
     function setAll(on) {
@@ -743,7 +761,7 @@
   }
 
   // ---------- 화면: 6. 권한 ----------
-  // 일반 시청자와 구독자가 쓸 수 있는 이미지 명령어/글자 꾸미기 태그를 정합니다.
+  // 일반 시청자와 구독자가 쓸 수 있는 채팅콘/BBCode 태그를 정합니다.
   // 값은 all(일반 시청자+구독자) / subscribers(구독자만) / staff(스트리머와 운영진만)이고, 기능마다 따로 정하지 않으면 기본 권한을 따릅니다.
   function permFlags(access) { return { viewer: access === 'all', sub: access === 'all' || access === 'subscribers' }; }
 
@@ -769,7 +787,7 @@
   function renderPermissions() {
     var c = begin('s-permissions', 'permissions', '6. 권한');
     var perm = S.cfg.permissions;
-    c.appendChild(h('p', { class: 'lead', text: '일반 시청자와 구독자가 쓸 수 있는 이미지 명령어와 글자 꾸미기를 정합니다. 권한이 없으면 쓴 글자 그대로 나옵니다. 스트리머와 운영진은 항상 모두 쓸 수 있습니다.' }));
+    c.appendChild(h('p', { class: 'lead', text: '일반 시청자와 구독자가 쓸 수 있는 채팅콘과 BBCode를 정합니다. 권한이 없으면 쓴 글자 그대로 나옵니다. 스트리머와 운영진은 항상 모두 쓸 수 있습니다.' }));
 
     function head() {
       return h('div', { class: 'permhead' }, h('span', { text: '' }), h('span', { class: 'permcol', text: '일반 시청자' }), h('span', { class: 'permcol', text: '구독자' }), h('span', { text: '' }));
@@ -781,8 +799,8 @@
     c.appendChild(h('div', { class: 'permbox' },
       h('div', { class: 'permtitle', text: '기본 권한' }),
       head(),
-      h('div', { class: 'permrow' }, h('span', { class: 'permname', text: '이미지 명령어' }), defImg.viewer, defImg.sub, h('span')),
-      h('div', { class: 'permrow' }, h('span', { class: 'permname', text: '글자 꾸미기' }), defTag.viewer, defTag.sub, h('span')),
+      h('div', { class: 'permrow' }, h('span', { class: 'permname', text: '채팅콘' }), defImg.viewer, defImg.sub, h('span')),
+      h('div', { class: 'permrow' }, h('span', { class: 'permname', text: 'BBCode' }), defTag.viewer, defTag.sub, h('span')),
       h('p', { class: 'msg muted', style: 'margin:6px 0 0', text: '따로 정하지 않은 기능과 새로 추가하는 항목은 이 기본 권한을 따릅니다.' })));
 
     c.appendChild(h('div', { id: 'permlists' }));
@@ -843,7 +861,7 @@
     var byPath = {};
     S.images.forEach(function (i) { byPath[i.path] = i; });
 
-    host.appendChild(permList('이미지 명령어별 권한', function (list) {
+    host.appendChild(permList('채팅콘별 권한', function (list) {
       var collator = new Intl.Collator('ko');
       var cmds = S.cfg.commands.filter(function (cm) { return cm.triggers.length; }).slice().sort(function (a, b) { return collator.compare(baseName(a.image), baseName(b.image)); });
       var shown = 0;
@@ -860,7 +878,7 @@
       return shown;
     }, 'img'));
 
-    host.appendChild(permList('글자 꾸미기 태그별 권한', function (list) {
+    host.appendChild(permList('BBCode 태그별 권한', function (list) {
       var shown = 0;
       Object.keys(BB.TAG_DEFS).forEach(function (canon) {
         var e = S.cfg.bbcode.tags[canon];

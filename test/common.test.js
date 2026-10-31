@@ -140,7 +140,7 @@ test('이미지 정렬 설정 저장: 알려진 값만', () => {
   assert.equal(L.normalizeConfig(null).ui.imageSort, 'name');
 });
 
-test('패널 순서: 글자 꾸미기가 숨길 채팅보다 먼저', () => {
+test('패널 순서: BBCode가 숨길 채팅보다 먼저', () => {
   const k = L.SECTION_KEYS;
   assert.ok(k.indexOf('bbcode') < k.indexOf('hidden'));
 });
@@ -219,7 +219,7 @@ test('권한 설정 정리: 알려진 값만 저장하고, 기본은 모두 허�
   assert.deepEqual(c.bbcode.tags, { rainbow: { access: 'subscribers' } });
 });
 
-test('권한: 이미지 명령어는 권한이 없는 사람에게는 이미지로 바뀌지 않고 글자 그대로 나온다', () => {
+test('권한: 채팅콘은 권한이 없는 사람에게는 이미지로 바뀌지 않고 글자 그대로 나온다', () => {
   const cfg = { permissions: { imageAccess: 'all' }, commands: [
     { triggers: ['~모두'], image: 'a.png' },                         // 기본 권한(모두)
     { triggers: ['~구독'], image: 'b.png', access: 'subscribers' },
@@ -240,7 +240,7 @@ test('권한: 기본 권한을 바꾸면 따로 정하지 않은 명령어가 �
   assert.equal(line('~b', cfg, viewerEv).querySelectorAll('img.cmd-img').length, 1, '따로 정한 "모두"가 기본 권한보다 우선');
 });
 
-test('권한: 글자 꾸미기 태그도 같은 방식 (한글 이름으로 불러도 권한이 적용된다)', () => {
+test('권한: BBCode 태그도 같은 방식 (한글 이름으로 불러도 권한이 적용된다)', () => {
   const cfg = { permissions: { tagAccess: 'all' }, bbcode: { tags: { rainbow: { names: ['rainbow', '무지개'], access: 'subscribers' }, blink: { access: 'staff' } } } };
   const has = (text, ev, cls) => line(text, cfg, ev).querySelector(cls) !== null;
   assert.ok(has('[b]굵게[/b]', viewerEv, '.bb-b'), '기본 권한(모두)은 일반 시청자도 사용');

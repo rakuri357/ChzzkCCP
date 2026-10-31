@@ -9,6 +9,7 @@ const { Store } = require('./store');
 const { ChatHub } = require('./chat-hub');
 const Lite = require('../../public/lib/common');
 const APP = require('./app-info');
+const { exportPage } = require('./export-page');
 
 const PUBLIC = path.join(__dirname, '..', '..', 'public');
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -139,6 +140,14 @@ async function startServer(options = {}) {
       sendJson(res, 200, { ok: true });
       if (typeof options.onQuit === 'function') setTimeout(() => options.onQuit(), 100);
       return;
+    }
+
+    // 시청자용 명령어 페이지(폴더)를 만들고, 열 수 있으면 폴더를 엽니다.
+    if (p === '/api/export-page' && req.method === 'POST') {
+      let result;
+      try { result = exportPage(store); } catch (e) { return sendJson(res, 500, { error: '내보내지 못했습니다: ' + e.message }); }
+      if (typeof options.openFolder === 'function') await options.openFolder(result.dir);
+      return sendJson(res, 200, Object.assign({ opened: typeof options.openFolder === 'function' }, result));
     }
 
     if (p === '/api/open-data-folder' && req.method === 'POST') {

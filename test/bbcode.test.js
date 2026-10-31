@@ -99,7 +99,7 @@ test('최대 글자 수에서 잘림', () => {
   assert.equal(plain('a'.repeat(1000), { limits: { maxLength: 50 } }).length, 50);
 });
 
-test('이미지 명령어가 글자를 대체한다', () => {
+test('채팅콘 명령어가 글자를 대체한다', () => {
   const cmds = { '~감사': { src: '/images/thanks.svg', alt: '~감사', height: '2.4em' } };
   const box = dom('고마워요 ~감사 정말', { commands: cmds });
   const img = box.querySelector('img.cmd-img');
@@ -282,4 +282,12 @@ test('회전, 두근두근은 움직이는 효과 한도에 걸린다', () => {
   assert.equal(box.querySelectorAll('.bb-spin, .bb-pulse, .bb-wave').length, 3);
   assert.equal(box.querySelector('.bb-type'), null);
   assert.ok(box.textContent.includes('[type]d'));
+});
+
+test('태그 순서: 정적인 태그가 위, 움직이는 태그가 아래', () => {
+  const defs = Object.values(BB.TAG_DEFS);
+  const firstMoving = defs.findIndex((d) => d.effect);
+  assert.ok(firstMoving > 0);
+  assert.ok(defs.slice(0, firstMoving).every((d) => !d.effect));
+  assert.ok(defs.slice(firstMoving).every((d) => d.effect));
 });

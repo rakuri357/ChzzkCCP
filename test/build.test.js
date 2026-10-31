@@ -14,9 +14,15 @@ test('빌드 설정: 포터블 exe와 폴더형을 함께 만들고, 언어팩�
   assert.deepEqual(pkg.build.electronLanguages, ['ko', 'en-US']);
 });
 
-test('릴리스 워크플로: 폴더형 zip을 만들어 해시 파일보다 먼저 모은다', () => {
+test('릴리스 워크플로: zip 안에 앱, OBS 스크립트, 사용법, 해시가 들어가고, 바깥 해시는 zip을 포함한다', () => {
   const yml = fs.readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
-  const zipAt = yml.indexOf('win-unpacked.zip');
-  const sumAt = yml.indexOf('sha256sum');
-  assert.ok(zipAt > 0 && sumAt > zipAt, 'zip이 SHA256SUMS에 포함되도록 먼저 만들어야 한다');
+  const copyAt = yml.indexOf('dist/ChzzkChatConPlus/');
+  const innerSumAt = yml.indexOf('cd dist/ChzzkChatConPlus && sha256sum');
+  const zipAt = yml.indexOf('-windows.zip');
+  const outerSumAt = yml.indexOf('cd release && sha256sum');
+  assert.ok(copyAt > 0 && innerSumAt > copyAt, 'lua와 사용법을 폴더에 넣은 뒤 안쪽 해시를 만든다');
+  assert.ok(zipAt > innerSumAt, '안쪽 해시까지 만든 뒤에 zip으로 묶는다');
+  assert.ok(outerSumAt > zipAt, 'zip을 만든 뒤에 바깥 해시를 만든다');
+  assert.ok(/sha256sum ChzzkChatConPlus\.exe chzzkchatconplus-obs\.lua USAGE-ko\.txt/.test(yml));
+  assert.ok(yml.includes('cp obs/chzzkchatconplus-obs.lua release/') && yml.includes('cp docs/USAGE-ko.txt release/'), '낱개 파일도 Release에 남긴다');
 });
