@@ -60,7 +60,7 @@ h2 { font-size: 17px; margin: 40px 0 6px; }
 .badge { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 0 7px; background: var(--accent-soft); color: var(--accent); vertical-align: 1px; }
 code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--accent-soft); color: var(--ink); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
 .bbsample { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 0; }
-.sample { font-size: 18px; line-height: 1.5; background: #1b1d2a; color: #fff; border-radius: 8px; padding: 3px 12px; } /* 방송 화면처럼 어두운 바탕 위에 보여 줍니다. */
+.sample { --font-size: 18px; font-size: 18px; line-height: 1.5; background: #1b1d2a; color: #fff; border-radius: 8px; padding: 3px 12px; } /* 방송 화면처럼 어두운 바탕 위에 보여 줍니다. */
 /* 움직이는 태그는 마우스를 올리거나 눌렀을 때만 움직입니다. (평소에는 멈춘 모양) */
 .sample:not(.play) .bb, .sample:not(.play) .bb-c, .sample:not(.play) .bb-marquee-inner { animation: none !important; }
 .sample:not(.play) .bb-type .bb-c { opacity: 1; }

@@ -302,3 +302,46 @@ test('권한 없는 부분 숨기기: 이미지만 남아도 줄은 남는다', 
   const l = line('~구독 ~모두', cfg, viewerEv);
   assert.ok(l && l.querySelectorAll('img.cmd-img').length === 1);
 });
+
+test('한도를 넘은 부분: 기본은 숨기고, 설정에서 쓴 글자 그대로 보이게 바꿀 수 있다', () => {
+  assert.equal(L.normalizeConfig(null).bbcode.overflowMode, 'hide');
+  assert.equal(L.normalizeConfig({ bbcode: { overflowMode: 'show' } }).bbcode.overflowMode, 'show');
+  assert.equal(L.normalizeConfig({ bbcode: { overflowMode: 'zzz' } }).bbcode.overflowMode, 'hide');
+  const text = '[blink]a[/blink][shake]b[/shake][rainbow]c[/rainbow][wave]d[/wave]';
+  const msg = (cfg) => line(text, cfg, viewerEv).querySelector('.msg').textContent;
+  assert.equal(msg({}), 'abcd', '기본(숨기기): 한도(3개)를 넘은 태그 글자만 지움');
+  assert.equal(msg({ bbcode: { overflowMode: 'show' } }), 'abc[wave]d[/wave]', '글자 그대로 보이기');
+  // 채팅콘 개수 한도
+  const cmds = { commands: [{ triggers: ['~a'], image: 'a.png' }] };
+  assert.equal(line('~a~a~a~a~a~a~a', cmds, viewerEv).querySelectorAll('img.cmd-img').length, 5);
+  assert.equal(line('~a~a~a~a~a~a~a', cmds, viewerEv).querySelector('.msg').textContent, '', '한도(5개)를 넘은 명령어 글자는 숨김');
+  assert.equal(line('~a~a~a~a~a~a~a', Object.assign({ bbcode: { overflowMode: 'show' } }, cmds), viewerEv).querySelector('.msg').textContent, '~a~a');
+  // 남는 글이 없으면 줄 전체를 숨김
+  assert.equal(line('[blink][/blink]', { bbcode: { limits: { maxEffects: 0 } } }, viewerEv), null);
+  assert.ok(line('[blink]x[/blink]', { bbcode: { limits: { maxEffects: 0 } } }, viewerEv), '안의 글이 있으면 줄은 남음');
+});
+
+test('이상한 글자만 있는 채팅은 줄을 숨기고, 보통 채팅은 그대로 둔다', () => {
+  assert.equal(line('ㅤㅤㅤ', {}, viewerEv), null);
+  assert.equal(line('‮​', {}, viewerEv), null);
+  assert.equal(line('안녕‮하세요', {}, viewerEv).querySelector('.msg').textContent, '안녕하세요');
+  assert.equal(line('   ', {}, viewerEv).querySelector('.msg').textContent, '   ', '원래 공백뿐인 채팅은 그대로');
+  assert.equal(line('안녕하세요', {}, viewerEv).querySelector('.msg').textContent, '안녕하세요');
+});
+
+test('채팅콘 순서(order): 같은 태그 안의 올바른 이미지 경로만, 중복 없이 저장한다', () => {
+  const c = L.normalizeConfig({ order: {
+    '인사': ['인사/b.png', '인사/a.png', '인사/b.png', '응원/x.png', '../evil.png', 7, '인사/c.txt'],
+    '': ['z.png', 'y.png'],
+    '표정/웃음': ['표정/웃음/q.gif'],
+    '나쁜//태그': ['a.png'],
+    '빈태그': [],
+    '배열아님': 'x'
+  } });
+  assert.deepEqual(c.order, { '인사': ['인사/b.png', '인사/a.png'], '': ['z.png', 'y.png'], '표정/웃음': ['표정/웃음/q.gif'] });
+  assert.deepEqual(L.normalizeConfig(null).order, {});
+  assert.deepEqual(L.normalizeConfig({ order: 'x' }).order, {});
+  assert.equal(L.orderRank(c.order, '인사', '인사/a.png'), 1);
+  assert.equal(L.orderRank(c.order, '인사', '인사/없음.png'), 1e9, '정하지 않은 것은 뒤로');
+  assert.equal(L.orderRank({}, '인사', '인사/a.png'), 1e9);
+});

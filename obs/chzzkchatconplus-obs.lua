@@ -213,6 +213,13 @@ local function ensure_running()
 end
 
 -- OBS를 끌 때, 이 스크립트가 켠 앱을 종료합니다.
+-- 강제 종료는 상태 파일이 방금 전까지 갱신된, 지금 실행 중인 앱에만 합니다.
+-- 앱이 비정상 종료되어 오래된 상태 파일이 남아 있으면 그 PID를 다른 프로그램이 쓰고 있을 수 있어서 종료하면 안 됩니다.
+local function can_force_kill(rt)
+  return SEP == "\\" and rt ~= nil and rt.pid ~= nil and is_fresh(rt)
+end
+if rawget(_G, "CHZZKCCP_TEST") then _G.ChzzkCCPTest = { can_force_kill = function(rt, sep) local old = SEP; if sep then SEP = sep end; local r = can_force_kill(rt); SEP = old; return r end } end
+
 local function quit_app()
   if quit_done or not (started_by_script and auto_quit) then return end
   local rt = read_runtime()
@@ -226,7 +233,7 @@ local function quit_app()
   end
   local result = os.execute(cmd)
   local ok = (result == 0) or (result == true)
-  if not ok and rt.pid and SEP == "\\" then
+  if not ok and can_force_kill(rt) then
     os.execute("taskkill /F /PID " .. rt.pid .. " >NUL 2>&1") -- curl을 쓸 수 없는 경우의 대비책
   end
   log(obs.LOG_INFO, "OBS를 종료하므로 ChzzkChatConPlus 앱도 종료합니다.")

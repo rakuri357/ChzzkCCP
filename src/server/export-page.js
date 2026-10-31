@@ -35,7 +35,8 @@ function collect(cfg, images) {
     const parts = Lite.splitImagePath(c.image);
     commands.push({ image: c.image, src: imageUrl(c.image), tag: parts.tag, name: parts.name, triggers: c.triggers.slice(), subscriber: access === 'subscribers' });
   });
-  commands.sort((a, b) => collator.compare(a.tag, b.tag) || collator.compare(a.name, b.name));
+  // 태그 없는 것이 먼저, 그다음 태그 가나다순. 같은 태그 안에서는 내가 정한 순서, 정하지 않은 것은 그 뒤에 이름순.
+  commands.sort((a, b) => collator.compare(a.tag, b.tag) || (Lite.orderRank(cfg.order, a.tag, a.image) - Lite.orderRank(cfg.order, b.tag, b.image)) || collator.compare(a.name, b.name));
 
   const bbtags = [];
   const aliases = {};

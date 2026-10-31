@@ -36,6 +36,7 @@
   padding-left: 100%;
   animation: bb-marquee 7s linear infinite;
 }
+.bb-size { font-size: calc(var(--font-size, 1em) * var(--size, 1)); } /* 설정한 기본 글자 크기 기준이라 겹쳐 써도 곱해지지 않습니다 */
 .bb-bg { border-radius: 0.2em; padding: 0 0.15em; }
 .bb-outline { -webkit-text-stroke: 0.24em var(--ol, #000); paint-order: stroke fill; }
 .bb-grad2 {

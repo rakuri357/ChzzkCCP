@@ -120,6 +120,10 @@ summary { cursor: pointer; font-weight: 700; color: var(--muted); font-size: 14p
 .rowextra { grid-column: 2 / -1; display: grid; gap: 6px; }
 .rowextra:not(:has(> .msg:not([hidden]), > .rowpanel:not([hidden]))) { display: none; } /* 보여 줄 내용이 없으면 줄 자체를 없앱니다 */
 .rowextra .msg { margin: 0; }
+.imgrow.sortable { grid-template-columns: 18px 40px 124px minmax(0, 1fr) auto; }
+.imgrow.sortable .rowextra { grid-column: 3 / -1; }
+.draghandle { cursor: grab; user-select: none; text-align: center; color: var(--muted); font-size: 18px; line-height: 1; }
+.imgrow.dragging { opacity: .45; }
 .rowpanel { border-top: 1px dashed var(--line); padding-top: 8px; }
 .rowpanel[hidden], .rowextra .msg[hidden] { display: none; }
 .imgrow.missing .thumb { opacity: .4; }
@@ -172,7 +176,7 @@ summary { cursor: pointer; font-weight: 700; color: var(--muted); font-size: 14p
 .tagrow2.dim .tagsample { opacity: .5; }
 .tagrow2 .chips.compact { flex-wrap: wrap; min-width: 0; }
 /* 샘플 글자: 방송 화면처럼 어두운 바탕 위에 보여 줍니다. 마우스를 올린 줄만 움직입니다. */
-.tagsample { width: 150px; min-height: 30px; padding: 2px 10px; border-radius: 8px; background: #1b1d2a; color: #fff; font-size: 17px; font-weight: 700; line-height: 1.5; white-space: nowrap; overflow: hidden; }
+.tagsample { --font-size: 17px; width: 150px; min-height: 30px; padding: 2px 10px; border-radius: 8px; background: #1b1d2a; color: #fff; font-size: 17px; font-weight: 700; line-height: 1.5; white-space: nowrap; overflow: hidden; }
 .tagsample:not(.play) .bb, .tagsample:not(.play) .bb-c, .tagsample:not(.play) .bb-marquee-inner { animation: none !important; }
 .tagsample:not(.play) .bb-type .bb-c { opacity: 1; }
 .tagsample:not(.play) .bb-marquee-inner { padding-left: 0; }

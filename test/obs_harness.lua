@@ -1,5 +1,6 @@
 -- OBS 없이 OBS 스크립트의 동작(시작/대기/새로고침/종료 순서)을 확인하는 시험용 가짜 OBS 환경
 local script_path = arg[1]
+CHZZKCCP_TEST = true   -- 스크립트의 안전장치 판단 함수를 시험에서 부를 수 있게 합니다.
 local failures = 0
 local function check(cond, name) if cond then print("PASS " .. name) else print("FAIL " .. name); failures = failures + 1 end end
 
@@ -264,6 +265,18 @@ do
   real_execute('rm -rf "' .. dirk .. '"'); mkdir(dirk .. "/chzzkchatconplus-data"); write(dirk .. "/ChzzkChatConPlus.exe", "x")
   local o5 = make_obs(); boot(o5, dirk .. "/ChzzkChatConPlus.exe")
   check(count_exec(o5, "--hidden") == 1 and count_exec(o5, dirk) == 1, "윈도우가 아니면 한글 경로의 .exe도 그대로 실행한다")
+end
+
+-- 14) 강제 종료(taskkill)는 상태 파일이 최근일 때만: 오래된 상태 파일의 PID는 다른 프로그램의 것일 수 있다
+do
+  local o = make_obs(); load_script(o)
+  local can = ChzzkCCPTest.can_force_kill
+  check(can({ pid = 4321, port = 3939, updatedAt = clock }, "\\") == true, "최근 상태 파일이면 윈도우에서 강제 종료할 수 있다")
+  check(can({ pid = 4321, port = 3939, updatedAt = clock - 14 }, "\\") == true, "15초 안이면 최근으로 본다")
+  check(can({ pid = 4321, port = 3939, updatedAt = clock - 600 }, "\\") == false, "오래된 상태 파일이면 강제 종료하지 않는다")
+  check(can({ port = 3939, updatedAt = clock }, "\\") == false, "PID가 없으면 강제 종료하지 않는다")
+  check(can(nil, "\\") == false, "상태 파일이 없으면 강제 종료하지 않는다")
+  check(can({ pid = 4321, port = 3939, updatedAt = clock }, "/") == false, "윈도우가 아니면 강제 종료하지 않는다")
 end
 
 print(failures == 0 and "ALL OK" or ("FAILURES: " .. failures))

@@ -435,7 +435,7 @@
   }
 
   // 한 줄에 이미지 하나: [썸네일] [이름/크기·태그] [명령어 칩] [설정] [삭제]. 안내 문장은 오류나 경고가 있을 때만 보입니다.
-  function imageRow(item) {
+  function imageRow(item, sortable) {
     var path = item.path, name = item.name, missing = !!item.missing;
     var errText = '';
     var msg = h('p', { class: 'msg', hidden: true });
@@ -505,7 +505,8 @@
     } });
 
     var sizeText = item.size ? kb(item.size) + (item.size > 500 * 1024 ? ' · 큼' : '') : '';
-    var row = h('div', { class: 'imgrow' + (missing ? ' missing' : '') },
+    var row = h('div', { class: 'imgrow' + (missing ? ' missing' : '') + (sortable ? ' sortable' : ''), 'data-path': path, 'data-tag': item.tag },
+      sortable ? h('span', { class: 'draghandle', title: '끌어서 같은 태그 안의 순서를 바꿉니다', 'aria-hidden': 'true', text: '⠿' }) : null,
       h('img', { class: 'thumb', alt: '', src: item.url || TRANSPARENT_GIF }),
       h('div', { class: 'imginfo' },
         h('div', { class: 'imgname', title: path, text: name }),
@@ -545,7 +546,7 @@
     function byName(a, b) { return collator.compare(a.name, b.name) || collator.compare(a.path, b.path); }
     function cnt(r) { var e = cmdOf(r.path); return e ? e.triggers.length : 0; }
     filtered.sort(function (a, b) {
-      if (f.sort === 'tag') return collator.compare(a.tag, b.tag) || byName(a, b);
+      if (f.sort === 'tag') return collator.compare(a.tag, b.tag) || (L.orderRank(S.cfg.order, a.tag, a.path) - L.orderRank(S.cfg.order, b.tag, b.path)) || byName(a, b);
       if (f.sort === 'recent') return (b.mtime - a.mtime) || byName(a, b);
       if (f.sort === 'nocmd') return ((cnt(a) ? 1 : 0) - (cnt(b) ? 1 : 0)) || byName(a, b);
       return byName(a, b);
@@ -554,6 +555,44 @@
   }
 
   // 검색어/필터/정렬에 맞는 이미지만 보여 줍니다. (칸에 입력하는 동안에는 목록을 다시 그리지 않아서, 입력 중인 행이 사라지지 않습니다.)
+  // 같은 태그 안에서 줄을 끌어 순서를 바꿉니다. (⠿를 잡았을 때만 끌 수 있어서 명령어 입력이나 글자 선택과 겹치지 않습니다.)
+  function enableDrag(row, list) {
+    var handle = row.querySelector('.draghandle');
+    if (!handle) return;
+    var tag = row.getAttribute('data-tag');
+    handle.addEventListener('mousedown', function () {
+      row.draggable = true;
+      document.addEventListener('mouseup', function off() { row.draggable = false; document.removeEventListener('mouseup', off); });
+    });
+    row.addEventListener('dragstart', function (e) {
+      S.dragRow = row; row.classList.add('dragging');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', row.getAttribute('data-path')); }
+    });
+    row.addEventListener('dragover', function (e) {
+      var d = S.dragRow;
+      if (!d || d === row || d.getAttribute('data-tag') !== tag) return;   // 다른 태그 위에는 놓을 수 없습니다.
+      e.preventDefault();
+      var rect = row.getBoundingClientRect();
+      list.insertBefore(d, e.clientY > rect.top + rect.height / 2 ? row.nextSibling : row);
+    });
+    row.addEventListener('dragend', function () {
+      row.draggable = false; row.classList.remove('dragging');
+      if (S.dragRow === row) { S.dragRow = null; commitOrder(tag, list); }
+    });
+  }
+  // 화면에 보이는 순서를 그 태그의 순서로 저장합니다.
+  function commitOrder(tag, list) {
+    var paths = [];
+    Array.prototype.forEach.call(list.querySelectorAll('.imgrow.sortable'), function (r) {
+      if (r.getAttribute('data-tag') === tag) paths.push(r.getAttribute('data-path'));
+    });
+    var before = (S.cfg.order && S.cfg.order[tag]) || [];
+    if (paths.join('\n') === before.join('\n')) return;
+    S.cfg.order = S.cfg.order || {};
+    S.cfg.order[tag] = paths;
+    changed();
+  }
+
   function renderImageList() {
     var list = $('imglist'), count = $('imgcount');
     if (!list) return;
@@ -562,14 +601,23 @@
     var groups = {};
     v.shown.forEach(function (r) { groups[r.tag] = (groups[r.tag] || 0) + 1; });
     var lastTag = null;
+    var filtering = S.imgFilter.q.trim() || S.imgFilter.noCmd || S.imgFilter.tag !== null;
+    var sortable = S.imgFilter.sort === 'tag' && !filtering;   // 걸러 둔 상태에서는 일부만 보여서 순서를 바꿀 수 없습니다.
     v.shown.forEach(function (r) {
       if (S.imgFilter.sort === 'tag' && r.tag !== lastTag) {
         list.appendChild(h('div', { class: 'taghead', text: (r.tag || '태그 없음') + ' · ' + groups[r.tag] + '개' }));
         lastTag = r.tag;
       }
-      list.appendChild(imageRow(r));
+      var row = imageRow(r, sortable);
+      if (sortable) enableDrag(row, list);
+      list.appendChild(row);
     });
-    var filtering = S.imgFilter.q.trim() || S.imgFilter.noCmd || S.imgFilter.tag !== null;
+    var hint = $('orderhint');
+    if (hint) {
+      hint.hidden = S.imgFilter.sort !== 'tag';
+      hint.textContent = filtering ? '검색이나 태그 필터를 풀면 같은 태그 안의 순서를 바꿀 수 있습니다.'
+        : '⠿를 끌어서 같은 태그 안의 순서를 바꿉니다. 시청자용 명령어 페이지에 이 순서가 그대로 적용됩니다.';
+    }
     count.textContent = filtering ? '전체 ' + v.all + '개 중 ' + v.shown.length + '개 표시' : (v.all ? '이미지 ' + v.all + '개' : '');
     if (!v.shown.length) {
       list.appendChild(h('div', { class: 'dropzone', text: v.all
@@ -637,6 +685,7 @@
     c.appendChild(h('div', { class: 'imgbar' }, search,
       check('명령어 없는 이미지만 보기', S.imgFilter.noCmd, function (on) { S.imgFilter.noCmd = on; renderImageList(); }), sort));
     c.appendChild(h('div', { class: 'tagbar', id: 'tagbar', hidden: true }));
+    c.appendChild(h('p', { id: 'orderhint', class: 'msg muted', style: 'margin:0 0 6px', hidden: true }));
     c.appendChild(h('div', { class: 'imgcountrow' },
       h('div', { class: 'imgcount msg muted', id: 'imgcount' }),
       h('button', { type: 'button', class: 'small', text: '명령어 없는 이미지에 추천 명령어 붙이기', title: '지금 보이는 목록에서 명령어가 없는 이미지에, 파일 이름으로 만든 명령어(예: 식은땀.gif → ~식은땀)를 붙입니다.', onclick: applySuggestions })));
@@ -788,7 +837,8 @@
     var L2 = bb.limits;
     function lim(label, key, min, max) { return field(label, num(L2[key], min, max, function (n) { L2[key] = n; changed(); }), 'small'); }
     c.appendChild(h('details', null, h('summary', { text: '남용 방지 한도 (보통은 그대로 두십시오)' }),
-      h('p', { class: 'msg muted', text: '한도를 넘는 꾸밈은 글자 그대로 나옵니다.' }),
+      h('p', { class: 'msg muted', text: '태그 겹침, 태그 개수, 움직이는 효과, 채팅콘 개수의 한도를 넘은 부분을 어떻게 보여 줄지 정합니다. 형식이 틀린 태그(예: [color=bad])는 항상 쓴 글자 그대로 나옵니다.' }),
+      overflowModeField(),
       h('div', { class: 'row' }, lim('최대 글자 수', 'maxLength', 20, 1000), lim('태그 겹치는 깊이', 'maxDepth', 1, 10), lim('태그 개수', 'maxTags', 1, 50)),
       h('div', { class: 'row' }, lim('움직이는 효과 수', 'maxEffects', 0, 20), lim('글자 크기 하한(%)', 'minSize', 30, 100), lim('글자 크기 상한(%)', 'maxSize', 100, 400), lim('이미지 수', 'maxImages', 0, 30))));
   }
@@ -815,6 +865,15 @@
     });
     paint();
     return { viewer: h('label', { class: 'permcell', title: '일반 시청자' }, viewerCb), sub: h('label', { class: 'permcell', title: '구독자' }, subCb), repaint: paint };
+  }
+
+  // 남용 방지 한도를 넘은 부분의 처리
+  function overflowModeField() {
+    var sel = h('select', { 'aria-label': '한도를 넘은 부분', onchange: function (e) { S.cfg.bbcode.overflowMode = e.target.value; changed(); } },
+      h('option', { value: 'hide', text: '그 부분만 숨기기' }), h('option', { value: 'show', text: '쓴 글자 그대로 보이기' }));
+    sel.value = S.cfg.bbcode.overflowMode === 'show' ? 'show' : 'hide';
+    sel.style.minWidth = '210px';
+    return h('div', { class: 'row' }, field('한도를 넘은 부분', sel));
   }
 
   // 구독자 전용 기능을 권한 없이 썼을 때의 처리

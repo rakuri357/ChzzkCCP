@@ -27,6 +27,7 @@
     WebSocketImpl: null, // 웹소켓 구현 (기본: 전역 WebSocket, 없으면 ws 패키지)
     sourceKey: '',     // 스튜디오 채팅창 주소의 32자리(위젯 키). 있으면 채널 ID 대신 이것으로 채팅 채널을 찾습니다.
     watchMs: 15000,    // 접속한 뒤 채팅 채널이 바뀌었는지 다시 확인하는 간격
+    confirmMs: 3000,   // 바뀐 것으로 보이면 이만큼 뒤에 한 번 더 확인해서, 같은 값이 연속으로 확인될 때만 다시 접속 (일시적으로 다른 값이 오는 경우 대비)
     handshakeMs: 7000, // 접속 요청에 대한 응답을 기다리는 시간
     retryBaseSec: 3    // 재시도 간격(실패가 이어질수록 늘어나 최대 30초)
   };
@@ -244,11 +245,19 @@
                 watching = true;
                 self._resolveChat().then(function (r) {
                   if (done) return;
-                  if (r.chatChannelId !== chatChannelId) { finish(ChatError('rechannel', '채팅 채널이 바뀌었습니다.')); return; }
-                  if (r.liveStatus !== self.liveStatus) {
-                    self.liveStatus = r.liveStatus;
-                    self._status('connected', { liveStatus: self.liveStatus, chatChannelId: chatChannelId });
+                  if (r.chatChannelId === chatChannelId) {
+                    if (r.liveStatus !== self.liveStatus) {
+                      self.liveStatus = r.liveStatus;
+                      self._status('connected', { liveStatus: self.liveStatus, chatChannelId: chatChannelId });
+                    }
+                    return;
                   }
+                  // 바뀐 것으로 보이면 잠깐 뒤에 한 번 더 확인합니다. 같은 새 값이 연속으로 확인될 때만 다시 접속합니다.
+                  return new Promise(function (resolve) { setTimeout(resolve, o.confirmMs); })
+                    .then(function () { return self._resolveChat(); })
+                    .then(function (again) {
+                      if (!done && again.chatChannelId === r.chatChannelId) finish(ChatError('rechannel', '채팅 채널이 바뀌었습니다.'));
+                    });
                 }).catch(function () { /* 확인에 실패해도 다음 주기에 다시 시도합니다. */ })
                   .then(function () { watching = false; });
               }, o.watchMs);

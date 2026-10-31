@@ -61,7 +61,7 @@
       channel: { url: '', channelId: '', chatKey: '' }, // 채팅창 주소(스튜디오의 chzzk.naver.com/chat/…)를 넣으면 channelId 대신 chatKey(위젯 키)를 씁니다.
       commands: [], // { triggers: ['~감사', '~땡큐'], image: '표정/감사.svg', height: '', match: 'anywhere', access: '' }  (height가 비어 있으면 기본 높이를 따릅니다)
       hidden: { commands: [], prefixes: [] },
-      bbcode: { enabled: true, tags: {}, limits: JSON.parse(JSON.stringify(BB.DEFAULT_LIMITS)) },
+      bbcode: { enabled: true, tags: {}, limits: JSON.parse(JSON.stringify(BB.DEFAULT_LIMITS)), overflowMode: 'hide' }, // overflowMode: 한도를 넘은 부분을 숨길지(hide) 쓴 글자 그대로 둘지(show)
       overlay: {
         maxLines: 14, fontSize: 24, lineLifetimeSec: 10, showBadges: true, showNickname: true, showStatus: true,
         textColor: '#ffffff', outlineColor: '#000000', backgroundColor: 'rgba(0,0,0,0)', fontFamily: '',
@@ -70,6 +70,7 @@
       advanced: { apiBase: '', commApiBase: '', wsUrl: '' },
       // 일반 시청자/구독자가 쓸 수 있는 기능. 기능마다 따로 정하지 않으면 이 기본 권한을 따릅니다. (스트리머와 운영진은 항상 모두 쓸 수 있습니다.)
       permissions: { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide' },
+      order: {},   // 같은 태그 안에서 내가 정한 채팅콘 순서: { 태그: [이미지 경로…] }. 시청자용 명령어 페이지에 그대로 적용됩니다.
       ui: { collapsed: {}, imageSort: 'name', autoCommand: true }
     };
   }
@@ -222,6 +223,31 @@
     return n && n.length ? n[0] : null;
   }
 
+  // ---------- 채팅콘 순서 (같은 태그 안) ----------
+  /** 설정에서 읽은 순서를 정리: 올바른 이미지 경로만, 그 경로가 속한 태그의 목록에만, 중복 없이 */
+  function normalizeOrder(raw) {
+    var out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    Object.keys(raw).slice(0, 300).forEach(function (tag) {
+      var list = raw[tag];
+      if (!Array.isArray(list)) return;
+      var segs = splitTag(tag);
+      if (segs === null || segs.join('/') !== tag) return;
+      var seen = {}, arr = [];
+      list.forEach(function (p) {
+        var sp = splitImagePath(p);
+        if (sp && sp.tag === tag && !seen[p] && arr.length < 1000) { seen[p] = true; arr.push(p); }
+      });
+      if (arr.length) out[tag] = arr;
+    });
+    return out;
+  }
+  /** 같은 태그 안에서의 자리 번호. 순서를 정하지 않은 것은 정한 것들의 뒤로 (자리 번호가 아주 큼) */
+  function orderRank(order, tag, imagePath) {
+    var i = order && order[tag] ? order[tag].indexOf(imagePath) : -1;
+    return i < 0 ? 1e9 : i;
+  }
+
   // ---------- 설정 정리 ----------
   /** 어떤 값이 들어와도 안전한 설정으로 바꿉니다 (잘못된 값은 기본값/한도 안으로). */
   function normalizeConfig(raw) {
@@ -249,6 +275,7 @@
       bbcode: {
         enabled: bool(bb.enabled, true),
         tags: normalizeTags(bb.tags),
+        overflowMode: DENIED_MODES.indexOf(bb.overflowMode) >= 0 ? bb.overflowMode : 'hide',
         limits: {
           maxLength: Math.round(num(lim.maxLength, 20, 1000, L.maxLength)),
           maxDepth: Math.round(num(lim.maxDepth, 1, 10, L.maxDepth)),
@@ -282,6 +309,7 @@
         tagAccess: ACCESS.indexOf(perm.tagAccess) >= 0 ? perm.tagAccess : 'all',
         deniedMode: DENIED_MODES.indexOf(perm.deniedMode) >= 0 ? perm.deniedMode : 'hide'
       },
+      order: normalizeOrder(c.order),
       ui: { collapsed: collapsed, imageSort: IMAGE_SORTS.indexOf(ui.imageSort) >= 0 ? ui.imageSort : 'name', autoCommand: bool(ui.autoCommand, true) }
     };
   }
@@ -321,7 +349,7 @@
       tagAccess[canon] = (cfg.bbcode.tags[canon] && cfg.bbcode.tags[canon].access) || cfg.permissions.tagAccess;
       names[canon].forEach(function (n) { aliases[n] = canon; });
     });
-    return { cmds: cmds, tags: tags, tagAccess: tagAccess, aliases: aliases, deniedMode: cfg.permissions.deniedMode, limits: cfg.bbcode.limits, hiddenCommands: cfg.hidden.commands, hiddenPrefixes: cfg.hidden.prefixes };
+    return { cmds: cmds, tags: tags, tagAccess: tagAccess, aliases: aliases, deniedMode: cfg.permissions.deniedMode, overflowMode: cfg.bbcode.overflowMode, limits: cfg.bbcode.limits, hiddenCommands: cfg.hidden.commands, hiddenPrefixes: cfg.hidden.prefixes };
   }
 
   function isHidden(text, d) {
@@ -385,7 +413,7 @@
       else if (hideDenied && d.tagAccess[t] === 'subscribers') deniedTags.push(t);
     });
     var nodes = BB.parse(String(ev.content || ''), {
-      allowedTags: tags, deniedTags: deniedTags, aliases: d.aliases, limits: d.limits, commands: cmds, emojis: ev.emojis || {}
+      allowedTags: tags, deniedTags: deniedTags, hideOverflow: d.overflowMode !== 'show', aliases: d.aliases, limits: d.limits, commands: cmds, emojis: ev.emojis || {}
     });
     // 권한 때문에 글자를 지웠더니 보여 줄 내용이 남지 않으면 줄 전체를 숨깁니다.
     if (nodes.stripped > 0 && BB.isBlank(nodes)) return null;
@@ -430,6 +458,8 @@
     SECTION_KEYS: SECTION_KEYS,
     defaultConfig: defaultConfig,
     normalizeConfig: normalizeConfig,
+    normalizeOrder: normalizeOrder,
+    orderRank: orderRank,
     parseChannelId: parseChannelId,
     looksLikeChatLink: looksLikeChatLink,
     validTrigger: validTrigger,

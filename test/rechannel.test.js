@@ -17,7 +17,7 @@ function connect(fake, extra) {
   const chats = [], statuses = [];
   const client = new ChzzkChat(Object.assign({
     apiBase: fake.base, commApiBase: fake.base, wsUrl: fake.wsUrl, WebSocketImpl: WebSocket,
-    handshakeMs: 800, retryBaseSec: 0.1, watchMs: 60,
+    handshakeMs: 800, retryBaseSec: 0.1, watchMs: 60, confirmMs: 30,
     onChat: (c) => chats.push(c), onStatus: (s) => statuses.push(s)
   }, extra));
   client.start();
@@ -102,4 +102,17 @@ test('주기적 확인을 끄면(watchMs 0) 다시 확인하지 않는다', asyn
   await waitFor(() => statuses.some((s) => s.state === 'connected'));
   await new Promise((r) => setTimeout(r, 300));
   assert.equal(fake.state.liveStatusCalls, 1);
+});
+
+test('채팅 채널이 잠깐 다른 값으로 보였다가 돌아오면 다시 접속하지 않는다', async (t) => {
+  const fake = await startFakeChzzk();
+  const { client, statuses } = connect(fake, { channelId: CH, confirmMs: 250 });
+  t.after(async () => { client.stop(); await fake.close(); });
+  await waitFor(() => statuses.some((s) => s.state === 'connected'));
+  fake.setChatChannel('N5blip');
+  await new Promise((r) => setTimeout(r, 120));   // 한 번 다른 값이 확인되고, 재확인 전에
+  fake.setChatChannel('N1abc');                    // 원래 값으로 돌아옴
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(fake.state.connects.length, 1, '다시 접속하지 않는다');
+  assert.ok(!statuses.some((s) => s.state === 'connecting' && /새 채팅방/.test(s.detail.step || '')));
 });

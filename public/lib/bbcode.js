@@ -104,6 +104,16 @@
     TAG_DEFS[canon].names.forEach(function (n) { DEFAULT_ALIASES[n] = canon; });
   });
 
+  // 채팅 줄을 망가뜨리는 글자를 정리합니다.
+  //  - 제어 문자, 방향을 바꾸는 문자(글이 거꾸로 보임), 보이지 않는 채움 문자(빈 채팅처럼 보임)를 지웁니다.
+  //  - 한 글자 위에 쌓는 결합 문자는 2개까지만 남깁니다. (글자 위아래로 기호가 길게 쌓여 다른 줄을 가림)
+  //  이모티콘에 쓰는 글자 연결 문자(U+200D)와 이모티콘 변형 문자는 그대로 둡니다.
+  var STRIP_RE = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180E\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u206A-\u206F\u2800\u3164\uFEFF\uFFA0\uFFF9-\uFFFB]/g;
+  var MARKS_RE = /(\p{M}{2})\p{M}+/gu;
+  function cleanText(t) {
+    return t.replace(STRIP_RE, '').replace(MARKS_RE, '$1');
+  }
+
   function mergeLimits(limits) {
     var out = {};
     var k;
@@ -165,6 +175,7 @@
    *  options.limits      : DEFAULT_LIMITS 일부를 덮어쓰기
    *  options.commands    : { "~감사": { src, alt, height } }  이 사용자가 쓸 수 있는 채팅콘 명령어
    *  options.emojis      : { id: url }  치지직이 이벤트에 넣어 준 이모티콘 정보
+   *  options.hideOverflow : true이면 한도(겹침 깊이, 태그 개수, 움직이는 효과 수, 이미지 수)를 넘은 태그와 명령어 글자를 쓴 글자 그대로 두지 않고 지웁니다.
    *  options.deniedTags  : 권한이 없어서 "그 부분만 숨길" 태그 이름 배열. (여는 태그와 닫는 태그 글자를 지우고 안의 글자는 남깁니다.)
    *  options.aliases     : { 쓰는이름: 태그이름 }  예: { "무지개": "rainbow" }. 없으면 TAG_DEFS의 기본 이름(영문, 단축, 한글)을 사용
    */
@@ -173,10 +184,13 @@
     var limits = mergeLimits(options.limits);
     var allowed = toSet(options.allowedTags);
     var text = String(input == null ? '' : input);
+    var cleaned = cleanText(text);   // 채팅 줄을 망가뜨리는 이상한 글자를 먼저 정리합니다.
+    var stripped = cleaned !== text ? 1 : 0;
+    text = cleaned;
     if (text.length > limits.maxLength) text = text.slice(0, limits.maxLength);
 
     var denied = options.deniedTags ? new Set(options.deniedTags) : null;
-    var stripped = 0;
+    var hide = !!options.hideOverflow;
     var aliasMap = options.aliases || null;
     function canonical(written) {
       if (aliasMap) return Object.prototype.hasOwnProperty.call(aliasMap, written) ? aliasMap[written] : null;
@@ -223,8 +237,10 @@
         }
         if (idx < 0) { addText(m[0]); continue; }
         var wasSkipped = !stack[idx].node;
+        var wasHidden = !!stack[idx].hidden;
         stack.length = idx; // 닫힌 태그(또는 자리표시)까지 제거. 안쪽에서 닫히지 않은 태그는 여기서 함께 끝납니다.
-        if (wasSkipped) addText(m[0]); // 열리지 못한 태그의 짝이므로 글자로 남김
+        if (wasHidden) stripped++;          // 한도를 넘어 숨긴 태그의 짝도 함께 숨김
+        else if (wasSkipped) addText(m[0]); // 형식이 틀려 열리지 못한 태그의 짝이므로 글자로 남김
         continue;
       }
 
@@ -233,9 +249,14 @@
       var overDepth = realDepth() >= limits.maxDepth;
       var overTags = tagCount >= limits.maxTags;
       var overEffects = def.effect && effectCount >= limits.maxEffects;
-      if (arg === undefined || overDepth || overTags || overEffects) {
+      if (arg === undefined) {   // 형식이 틀린 태그: 한도와 상관없이 쓴 글자 그대로
         addText(m[0]);
         stack.push({ name: name, node: null });
+        continue;
+      }
+      if (overDepth || overTags || overEffects) {
+        if (hide) { stripped++; stack.push({ name: name, node: null, hidden: true }); }  // 한도를 넘은 태그: 태그 글자만 지움
+        else { addText(m[0]); stack.push({ name: name, node: null }); }
         continue;
       }
 
@@ -249,7 +270,7 @@
     // 끝까지 닫히지 않은 태그는 메시지 끝까지 적용됩니다.
 
     // 텍스트 노드 안에서 이모티콘과 채팅콘 명령어를 이미지 노드로 바꿉니다.
-    var budget = { images: limits.maxImages, stripped: 0 };
+    var budget = { images: limits.maxImages, stripped: 0, hide: hide };
     expandInline(rootNode, options.commands || {}, options.emojis || {}, budget);
     var result = rootNode.children;
     result.stripped = stripped + budget.stripped; // 권한이 없어서 지운 태그와 명령어의 수
@@ -290,6 +311,13 @@
         var next = null;
         if (nextEmoji && (!nextCmd || nextEmoji.index <= nextCmd.index)) next = nextEmoji;
         else if (nextCmd) next = nextCmd;
+        if (next && budget.images <= 0 && budget.hide && next.node.type !== 'removed') {
+          // 이미지 수 한도를 넘은 명령어/이모티콘: 그 글자만 지웁니다.
+          if (next.index > pos) parts.push({ type: 'text', value: value.slice(pos, next.index) });
+          budget.stripped++;
+          pos = next.index + next.length;
+          continue;
+        }
         if (!next || (budget.images <= 0 && next.node.type !== 'removed')) { parts.push({ type: 'text', value: value.slice(pos) }); break; }
         if (next.index > pos) parts.push({ type: 'text', value: value.slice(pos, next.index) });
         if (next.node.type === 'removed') budget.stripped++; // 권한이 없는 명령어: 글자만 지웁니다.
@@ -398,7 +426,7 @@
     var el = doc.createElement('span');
     el.className = 'bb bb-' + n.name;
     if (n.name === 'color' && n.arg) el.style.color = n.arg;
-    if (n.name === 'size' && n.arg) el.style.fontSize = n.arg + '%';
+    if (n.name === 'size' && n.arg) el.style.setProperty('--size', String(n.arg / 100)); // 크기는 겹쳐도 곱해지지 않게 bbcode.css에서 기본 글자 크기 기준으로 계산
     if (n.name === 'glow') el.style.setProperty('--glow', n.arg || '#ffffff');
     if (n.name === 'neon') el.style.setProperty('--c', n.arg || '#ff2bd6');
     if (n.name === 'bg') el.style.backgroundColor = n.arg;
@@ -438,6 +466,7 @@
     render: render,
     toPlainText: toPlainText,
     isBlank: isBlank,
+    cleanText: cleanText,
     normalizeColor: normalizeColor
   };
 });

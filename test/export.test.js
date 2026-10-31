@@ -234,3 +234,22 @@ test('페이지: 소제목은 BBCode (글자 꾸미기)이고, 이름은 눌리�
   assert.ok([...doc.querySelectorAll('.bbrow')].every((r) => r.tagName === 'BUTTON'));
   assert.equal(doc.querySelectorAll('.bbrow button').length, 0);
 });
+
+test('내보내기 순서: 태그 없는 것 먼저, 태그는 가나다순, 같은 태그 안에서는 내가 정한 순서(정하지 않은 것은 그 뒤)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'order-'));
+  const store = new Store(dir).init();
+  for (const [name, tag] of [['가.png', ''], ['나.png', ''], ['하나.png', '인사'], ['둘.png', '인사'], ['셋.png', '인사'], ['넷.png', '인사'], ['웃음.png', '표정'], ['울음.png', '표정']]) store.saveImage(name, PNG, tag);
+  const cmd = (image) => ({ triggers: ['~' + image.replace(/\.png$/, '').split('/').pop()], image });
+  const all = ['가.png', '나.png', '인사/하나.png', '인사/둘.png', '인사/셋.png', '인사/넷.png', '표정/웃음.png', '표정/울음.png'].map(cmd);
+  const names = (cfg) => collect(Object.assign({}, store.config, cfg), store.listImages()).commands.map((c) => c.name);
+  store.save({ commands: all });
+  assert.deepEqual(names({}), ['가.png', '나.png', '넷.png', '둘.png', '셋.png', '하나.png', '울음.png', '웃음.png'], '정하지 않았으면 이름순');
+  // 인사 태그 안에서만 순서를 정함: 셋, 하나 (나머지는 그 뒤에 이름순)
+  assert.deepEqual(names({ order: { 인사: ['인사/셋.png', '인사/하나.png'] } }),
+    ['가.png', '나.png', '셋.png', '하나.png', '넷.png', '둘.png', '울음.png', '웃음.png']);
+  // 태그 없는 것 안에서도, 다른 태그와 섞이지 않는다
+  assert.deepEqual(names({ order: { '': ['나.png', '가.png'], 표정: ['표정/웃음.png'] } }),
+    ['나.png', '가.png', '넷.png', '둘.png', '셋.png', '하나.png', '웃음.png', '울음.png']);
+  // 지워진 파일이 순서에 남아 있어도 문제가 없다
+  assert.equal(names({ order: { 인사: ['인사/없음.png', '인사/하나.png'] } }).indexOf('하나.png') < names({ order: { 인사: ['인사/없음.png', '인사/하나.png'] } }).indexOf('넷.png'), true);
+});

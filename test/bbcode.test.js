@@ -87,12 +87,12 @@ test('효과 한도 0이면 효과 태그는 전부 글자', () => {
 });
 
 test('글자 크기는 한도 안으로 고정', () => {
-  assert.equal(dom('[size=999]x[/size]').querySelector('.bb-size').style.fontSize, '200%'); // 한도로 고정
+  assert.equal(dom('[size=999]x[/size]').querySelector('.bb-size').style.getPropertyValue('--size'), '2'); // 한도로 고정(200%)
   assert.equal(dom('[size=1000]x[/size]').querySelector('.bb-size'), null); // 4자리는 형식 오류 → 글자 그대로
   const clamp = dom('[size=300]x[/size]', { limits: { maxSize: 200 } });
-  assert.equal(clamp.querySelector('.bb-size').style.fontSize, '200%');
+  assert.equal(clamp.querySelector('.bb-size').style.getPropertyValue('--size'), '2');
   const small = dom('[size=10]x[/size]', { limits: { minSize: 70 } });
-  assert.equal(small.querySelector('.bb-size').style.fontSize, '70%');
+  assert.equal(small.querySelector('.bb-size').style.getPropertyValue('--size'), '0.7');
 });
 
 test('최대 글자 수에서 잘림', () => {
@@ -199,7 +199,7 @@ test('별칭이 가리키는 태그가 허용 목록에 없으면 꾸미지 않�
 test('인자가 있는 태그도 한글 이름으로: [색=red], [크기=150]', () => {
   const al = { 색: 'color', 크기: 'size' };
   assert.equal(dom('[색=red]x[/색]', { aliases: al }).querySelector('.bb-color').style.color, 'red');
-  assert.equal(dom('[크기=150]x[/크기]', { aliases: al }).querySelector('.bb-size').style.fontSize, '150%');
+  assert.equal(dom('[크기=150]x[/크기]', { aliases: al }).querySelector('.bb-size').style.getPropertyValue('--size'), '1.5');
 });
 
 test('일상 글자와 겹치는 [숫자]나 모르는 이름은 글자 그대로', () => {
@@ -372,4 +372,60 @@ test('권한 없는 명령어 숨기기: 글자만 지우고 이미지 개수는
   assert.equal(BB.isBlank(BB.parse('~구독 ', { commands: cmds })), true);
   assert.equal(BB.isBlank(BB.parse('~구독 ~모두', { commands: cmds })), false);
   assert.equal(BB.isBlank(BB.parse('안녕', {})), false);
+});
+
+// ---------- 글자 크기 겹침, 한도를 넘은 부분 숨기기, 이상한 글자 정리 ----------
+test('글자 크기는 겹쳐도 곱해지지 않는다: 바깥 글자가 아니라 설정한 기본 글자 크기 기준', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'lib', 'bbcode.css'), 'utf8');
+  assert.ok(/\.bb-size \{[^}]*calc\(var\(--font-size, 1em\) \* var\(--size, 1\)\)/.test(css), '크기는 --font-size에 값을 곱해 계산');
+  assert.ok(!/\.bb-size[^{]*\{[^}]*font-size: *\d+%/.test(css), '퍼센트로 바깥 글자를 기준 삼지 않음');
+  const box = dom('[size=200][size=200][size=200][size=150]x[/size][/size][/size][/size]', { limits: { maxDepth: 10 } });
+  const sizes = [...box.querySelectorAll('.bb-size')].map((e) => e.style.getPropertyValue('--size'));
+  assert.deepEqual(sizes, ['2', '2', '2', '1.5'], '각 태그가 자기 값만 가진다');
+  assert.ok(![...box.querySelectorAll('.bb-size')].some((e) => e.style.fontSize), '요소에 퍼센트 font-size를 직접 넣지 않음');
+});
+
+test('한도를 넘은 부분 숨기기(hideOverflow): 태그는 태그 글자만, 채팅콘과 이모티콘은 그 글자를 지운다', () => {
+  const hide = (s, o) => { const n = BB.parse(s, Object.assign({ allowedTags: ALL, hideOverflow: true }, o)); return { text: BB.toPlainText(n), stripped: n.stripped }; };
+  // 움직이는 효과 수: 2개까지만 적용, 3번째는 태그 글자만 지움 (닫는 태그도)
+  const r = hide('[blink]1[/blink][shake]2[/shake][rainbow]3[/rainbow]', { limits: { maxEffects: 2 } });
+  assert.equal(r.text, '123');
+  assert.equal(r.stripped, 2);
+  assert.equal(dom('[blink]1[/blink][shake]2[/shake][rainbow]3[/rainbow]', { limits: { maxEffects: 2 }, hideOverflow: true }).querySelectorAll('.bb-rainbow').length, 0);
+  // 겹침 깊이, 태그 개수
+  assert.equal(hide('[b][i][u][s][b]깊다[/b][/s][/u][/i][/b]', { limits: { maxDepth: 3 } }).text, '깊다');
+  assert.equal(hide('[b]a[/b][b]b[/b][b]c[/b]', { limits: { maxTags: 2 } }).text, 'abc');
+  // 형식이 틀린 태그는 한도와 상관없이 글자 그대로
+  assert.equal(hide('[color=bad]x[/color]').text, '[color=bad]x[/color]');
+  assert.equal(hide('[1] [ㅋㅋ]').text, '[1] [ㅋㅋ]');
+  // 채팅콘 개수와 이모티콘
+  const cmds = { '~a': { src: '/images/a.svg' } };
+  const img = hide('~a~a~a~a', { commands: cmds, limits: { maxImages: 2 } });
+  assert.equal(img.text, '~a~a');
+  assert.equal(img.stripped, 2);
+  const emo = hide('{:x:}{:x:}{:x:}', { emojis: { x: 'https://ssl.pstatic.net/a.gif' }, limits: { maxImages: 1 } });
+  assert.equal(emo.stripped, 2);
+});
+
+test('한도를 넘은 부분을 숨기지 않는 설정(기본 parse)에서는 예전처럼 글자 그대로', () => {
+  assert.equal(plain('[blink]1[/blink][shake]2[/shake][rainbow]3[/rainbow]', { limits: { maxEffects: 2 } }), '12[rainbow]3[/rainbow]');
+  const box = dom('~a~a~a', { commands: { '~a': { src: '/images/a.svg' } }, limits: { maxImages: 1 } });
+  assert.equal(box.querySelectorAll('img').length, 1);
+  assert.equal(box.textContent, '~a~a');
+});
+
+test('이상한 글자 정리: 방향 바꿈, 보이지 않는 채움, 제어 문자는 지우고 결합 문자는 2개까지만', () => {
+  assert.equal(BB.cleanText('abc\u202Edef'), 'abcdef');
+  assert.equal(BB.cleanText('\u3164\u3164\u200B\uFEFF'), '');
+  assert.equal(BB.cleanText('a\u0000b\u0007c\u007F'), 'abc');
+  assert.equal(BB.cleanText('안\u0301\u0302\u0303\u0304\u0305녕'), '안\u0301\u0302녕');
+  assert.equal(BB.cleanText('안녕하세요 ~감사 [b]굵게[/b] {:d_1:}'), '안녕하세요 ~감사 [b]굵게[/b] {:d_1:}', '보통 글은 그대로');
+  assert.equal(BB.cleanText('👨\u200D👩\u200D👧 ❤\uFE0F 👍\u{1F3FD}'), '👨\u200D👩\u200D👧 ❤\uFE0F 👍\u{1F3FD}', '이모티콘 연결 문자와 변형 문자는 그대로');
+  // 지운 글자가 있고 남는 글이 없으면 stripped가 올라가 줄을 숨길 수 있다
+  const n = BB.parse('\u3164\u3164');
+  assert.equal(BB.isBlank(n), true);
+  assert.equal(n.stripped, 1);
+  assert.equal(BB.parse('   ').stripped, 0, '원래 공백뿐인 글은 건드리지 않는다');
+  const zalgo = BB.parse('안' + '\u0301\u0302\u0303\u0304\u0305\u0306\u0307'.repeat(10) + '녕');
+  assert.equal(BB.toPlainText(zalgo), '안\u0301\u0302녕');
 });
