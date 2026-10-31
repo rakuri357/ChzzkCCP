@@ -8,7 +8,7 @@ const path = require('path');
 const http = require('http');
 const WebSocket = require('ws');
 const { startServer } = require('../src/server/server');
-const { startFakeChzzk } = require('./fake-chzzk');
+const { startFakeChzzk, WIDGET_KEY } = require('./fake-chzzk');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitFor(fn, ms = 5000) {
@@ -67,7 +67,7 @@ test('첫 실행은 빈 상태로 시작하고, 설정 저장, 치지직 접속�
   await waitFor(() => got.find((m) => m.type === 'config') && got.find((m) => m.type === 'status'));
 
   // 채널 링크 저장 → 자동 접속
-  const saved = await putConfig(app.port, { ...st0.config, channel: { url: `https://chzzk.naver.com/chat/${CH}` }, hidden: { commands: ['!목록'], prefixes: [] } });
+  const saved = await putConfig(app.port, { ...st0.config, channel: { url: `https://chzzk.naver.com/${CH}` }, hidden: { commands: ['!목록'], prefixes: [] } });
   assert.equal(saved.status, 200);
   assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')).channel.channelId, CH);
   await waitFor(() => got.some((m) => m.type === 'status' && m.status.state === 'connected'));
@@ -169,6 +169,34 @@ test('사용 중인 포트면 다음 포트로', async (t) => {
   t.after(async () => { await a.close(); await b.close(); });
   assert.equal(a.port, 38999);
   assert.equal(b.port, 39000);
+});
+
+test('스튜디오의 채팅창 주소를 넣으면 위젯 키로 접속하고, 방송이 바뀌어 채팅 채널이 달라져도 자동으로 따라간다', async (t) => {
+  const fake = await startFakeChzzk();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'app9-'));
+  const app = await startServer({ dataDir: dir, port: 0, chatOptions: { apiBase: fake.base, commApiBase: fake.base, wsUrl: fake.wsUrl, handshakeMs: 800, retryBaseSec: 0.1, watchMs: 60 } });
+  t.after(async () => { await app.close(); await fake.close(); });
+  const got = [];
+  const ws = new WebSocket(`ws://127.0.0.1:${app.port}/ws`);
+  ws.on('message', (d) => got.push(JSON.parse(d.toString())));
+  await new Promise((r) => ws.on('open', r));
+  const st = JSON.parse((await req(app.port, 'GET', '/api/state')).text);
+  const saved = JSON.parse((await putConfig(app.port, { ...st.config, channel: { url: `https://chzzk.naver.com/chat/${WIDGET_KEY}` } })).text);
+  assert.equal(saved.channel.chatKey, WIDGET_KEY);
+  assert.equal(saved.channel.channelId, '');
+  await waitFor(() => got.find((m) => m.type === 'status' && m.status.state === 'connected'));
+  assert.equal(fake.state.liveStatusCalls, 0);
+  fake.emit({ msg: '방송 전' });
+  await waitFor(() => got.find((m) => m.type === 'chat' && m.msg.content === '방송 전'));
+
+  fake.setChatChannel('N9live');   // 방송 시작
+  await waitFor(() => fake.state.connects.some((c) => c.cid === 'N9live'));
+  await waitFor(() => fake.state.sockets.size === 1);
+  fake.emit({ msg: '방송 중' });
+  await waitFor(() => got.find((m) => m.type === 'chat' && m.msg.content === '방송 중'));
+  const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
+  assert.equal(cfg.channel.chatKey, WIDGET_KEY);
+  ws.close();
 });
 
 test('OBS 연동: 실행 상태 파일(runtime.json)과 종료 요청', async (t) => {

@@ -7,6 +7,8 @@
  *
  * 접속 순서
  *   1) 채널 ID → 채팅 채널 ID 확인   (api.chzzk.naver.com)
+ *      또는 스튜디오의 채팅창 주소(위젯 키) → 채팅 채널 ID 확인 (sourceKey)
+ *      채팅 채널 ID는 방송이 바뀌면 달라지므로, 접속한 뒤에도 주기적으로 다시 확인해서 바뀌면 새 채팅방으로 다시 접속합니다.
  *   2) 채팅 접속용 토큰 받기          (comm-api.game.naver.com)
  *   3) 웹소켓 접속 → 접속 요청(cmd 100) → 응답(cmd 10100) → 채팅 수신(cmd 93101)
  */
@@ -23,6 +25,8 @@
     recent: 0,        // 접속 직후 받아 올 최근 채팅 수 (연결 테스트용)
     headers: null,     // 치지직 REST 요청에 붙일 헤더 (앱에서는 브라우저처럼 보이는 User-Agent)
     WebSocketImpl: null, // 웹소켓 구현 (기본: 전역 WebSocket, 없으면 ws 패키지)
+    sourceKey: '',     // 스튜디오 채팅창 주소의 32자리(위젯 키). 있으면 채널 ID 대신 이것으로 채팅 채널을 찾습니다.
+    watchMs: 15000,    // 접속한 뒤 채팅 채널이 바뀌었는지 다시 확인하는 간격
     handshakeMs: 7000, // 접속 요청에 대한 응답을 기다리는 시간
     retryBaseSec: 3    // 재시도 간격(실패가 이어질수록 늘어나 최대 30초)
   };
@@ -118,6 +122,13 @@
       var err;
       try { err = await this._connectOnce(); } catch (e) { err = e; }
       if (this.stopped) break;
+      if (err.kind === 'rechannel') {
+        // 방송이 바뀌어 채팅 채널이 달라진 경우: 오래 기다리지 않고 새 채팅방으로 다시 접속
+        this.fails = 0;
+        this._status('connecting', { step: '방송이 바뀌어 새 채팅방으로 다시 연결하는 중' });
+        await this._sleep(1000);
+        continue;
+      }
       var info = { kind: err.kind || 'unknown', message: err.message || String(err), hint: err.hint || '' };
       this.fails = Date.now() - startedAt > 60000 ? 1 : this.fails + 1;
       var seconds = Math.min(30, this.o.retryBaseSec * Math.pow(2, Math.min(this.fails - 1, 3)));
@@ -126,7 +137,7 @@
     }
   };
 
-  ChzzkChat.prototype._fetchJson = async function (url, what) {
+  ChzzkChat.prototype._fetchJson = async function (url, what, hint404) {
     var res;
     try {
       res = await fetch(url, { cache: 'no-store', headers: this.o.headers || undefined });
@@ -134,7 +145,7 @@
       throw ChatError('network', what + ' 요청이 막혔습니다.',
         '인터넷 연결을 확인하십시오. 방화벽/보안 프로그램이 이 앱의 인터넷 사용을 막고 있지 않은지도 확인하십시오.');
     }
-    if (!res.ok) throw ChatError('http', what + ' 요청이 실패했습니다 (HTTP ' + res.status + ').', res.status === 404 ? '채널 ID를 찾을 수 없습니다. 채팅창 링크가 아니라 내 채널 페이지 주소(https://chzzk.naver.com/…)를 넣어야 할 수 있습니다.' : '');
+    if (!res.ok) throw ChatError('http', what + ' 요청이 실패했습니다 (HTTP ' + res.status + ').', res.status === 404 ? (hint404 || '채널 ID를 찾을 수 없습니다. 내 채널 페이지 주소(https://chzzk.naver.com/…)나 스튜디오의 채팅창 주소가 맞는지 확인하십시오.') : '');
     var json;
     try { json = await res.json(); } catch (e) { throw ChatError('format', what + ' 응답을 읽지 못했습니다.'); }
     if (json && typeof json.code === 'number' && json.code !== 200) {
@@ -143,14 +154,29 @@
     return json;
   };
 
-  ChzzkChat.prototype._connectOnce = async function () {
+  /** 지금의 채팅 채널 ID를 알아냅니다. 채팅창 주소(위젯 키)가 있으면 그것으로, 없으면 채널 ID로 방송 상태를 조회합니다. */
+  ChzzkChat.prototype._resolveChat = async function () {
     var o = this.o;
-    this._status('connecting', { step: '채널 확인 중' });
+    if (o.sourceKey) {
+      var src = await this._fetchJson(o.apiBase + '/manage/v1/chats/sources/' + encodeURIComponent(o.sourceKey), '채팅창 정보',
+        '이 채팅창 주소를 찾을 수 없습니다. 스튜디오의 채팅창 URL이 맞는지 확인하십시오. 계속 안 되면 내 채널 페이지 주소를 넣으십시오.');
+      var id = src && src.content && src.content.chatChannelId;
+      if (!id) throw ChatError('channel', '이 채팅창 주소의 채팅 정보를 찾지 못했습니다.', '스튜디오의 채팅창 URL이 맞는지 확인하십시오. 계속 안 되면 내 채널 페이지 주소를 넣으십시오.');
+      return { chatChannelId: id, liveStatus: '' };
+    }
     var live = await this._fetchJson(o.apiBase + '/polling/v2/channels/' + encodeURIComponent(o.channelId) + '/live-status', '채널 정보');
     var content = live && live.content;
     var chatChannelId = content && content.chatChannelId;
     if (!chatChannelId) throw ChatError('channel', '이 채널의 채팅 정보를 찾지 못했습니다.', '내 채널 페이지 주소(https://chzzk.naver.com/…)가 맞는지 확인하십시오.');
-    this.liveStatus = content.status || '';
+    return { chatChannelId: chatChannelId, liveStatus: content.status || '' };
+  };
+
+  ChzzkChat.prototype._connectOnce = async function () {
+    var o = this.o;
+    this._status('connecting', { step: '채널 확인 중' });
+    var r = await this._resolveChat();
+    var chatChannelId = r.chatChannelId;
+    this.liveStatus = r.liveStatus;
 
     this._status('connecting', { step: '채팅 접속 권한 받는 중', liveStatus: this.liveStatus });
     var tok = await this._fetchJson(o.commApiBase + '/nng_main/v1/chats/access-token?channelId=' + encodeURIComponent(chatChannelId) + '&chatType=STREAMING', '채팅 접속 권한');
@@ -171,13 +197,13 @@
       try { ws = new WS(url, o.headers ? { headers: { 'User-Agent': o.headers['User-Agent'] } } : undefined); }
       catch (e) { resolve(ChatError('ws', '채팅 서버 주소가 올바르지 않습니다.')); return; }
       self.ws = ws;
-      var connected = false, done = false, hb = null, handshake = null;
+      var connected = false, done = false, hb = null, handshake = null, watch = null, watching = false;
 
       function send(obj) { try { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); } catch (e) { /* 무시 */ } }
       function finish(err) {
         if (done) return;
         done = true;
-        clearInterval(hb); clearTimeout(handshake);
+        clearInterval(hb); clearTimeout(handshake); clearInterval(watch);
         try { ws.close(); } catch (e) { /* 무시 */ }
         if (self.ws === ws) self.ws = null;
         resolve(err);
@@ -211,6 +237,22 @@
             self.fails = 0;
             hb = setInterval(function () { send({ ver: self.ver, cmd: CMD.PING }); }, 20000);
             self._status('connected', { liveStatus: self.liveStatus, chatChannelId: chatChannelId });
+            // 방송이 시작되거나 끝나면 채팅 채널이 달라지므로 주기적으로 다시 확인합니다. (확인이 실패해도 지금 연결은 끊지 않습니다.)
+            if (o.watchMs > 0) {
+              watch = setInterval(function () {
+                if (watching || done) return;
+                watching = true;
+                self._resolveChat().then(function (r) {
+                  if (done) return;
+                  if (r.chatChannelId !== chatChannelId) { finish(ChatError('rechannel', '채팅 채널이 바뀌었습니다.')); return; }
+                  if (r.liveStatus !== self.liveStatus) {
+                    self.liveStatus = r.liveStatus;
+                    self._status('connected', { liveStatus: self.liveStatus, chatChannelId: chatChannelId });
+                  }
+                }).catch(function () { /* 확인에 실패해도 다음 주기에 다시 시도합니다. */ })
+                  .then(function () { watching = false; });
+              }, o.watchMs);
+            }
             if (o.recent > 0) {
               send({ ver: self.ver, cmd: CMD.RECENT, svcid: 'game', cid: chatChannelId, sid: b.sid, tid: 2, bdy: { recentMessageCount: o.recent } });
             }

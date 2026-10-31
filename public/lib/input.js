@@ -150,7 +150,7 @@
     if (key === 'obs') return S.urls.overlay || '';
     if (key === 'channel') {
       var st = S.status.state;
-      if (!cfg.channel.channelId) return '링크를 입력하십시오';
+      if (!cfg.channel.channelId && !cfg.channel.chatKey) return '링크를 입력하십시오';
       return st === 'connected' ? '✓ 연결됨' : st === 'retry' ? '✗ 연결 실패' : '연결 중…';
     }
     if (key === 'images') {
@@ -266,11 +266,13 @@
     var m = $('channelmsg');
     if (!m) return;
     var id = L.parseChannelId(url);
-    S.cfg.channel.channelId = id;
-    if (!url.trim()) { m.className = 'msg muted'; m.textContent = '치지직에서 내 채널로 들어갔을 때 주소창에 보이는 주소를 붙여 넣으십시오. (https://chzzk.naver.com/ 뒤에 32자리 영문+숫자)'; }
-    else if (!id) { m.className = 'msg bad'; m.textContent = '주소에서 채널 ID를 찾지 못했습니다. https://chzzk.naver.com/ 뒤에 32자리 영문+숫자가 있는 주소를 붙여 넣으십시오.'; }
-    else if (L.looksLikeChatLink(url)) { m.className = 'msg warn'; m.textContent = '채팅창 링크로 보입니다. 이 링크의 번호는 채널 ID가 아닐 수 있어서 연결되지 않을 수 있습니다. 연결되지 않으면 내 채널 페이지 주소(https://chzzk.naver.com/…)를 넣으십시오.'; }
-    else { m.className = 'msg ok'; m.textContent = '✓ 채널을 인식했습니다 (' + id.slice(0, 6) + '…' + id.slice(-4) + ')'; }
+    var chat = !!id && L.looksLikeChatLink(url);   // 스튜디오의 채팅창 주소
+    S.cfg.channel.channelId = chat ? '' : id;
+    S.cfg.channel.chatKey = chat ? id : '';
+    if (!url.trim()) { m.className = 'msg muted'; m.textContent = '내 채널 페이지 주소(https://chzzk.naver.com/ 뒤에 32자리 영문+숫자)나 스튜디오의 채팅창 URL(https://chzzk.naver.com/chat/…)을 붙여 넣으십시오.'; }
+    else if (!id) { m.className = 'msg bad'; m.textContent = '주소에서 32자리 영문+숫자를 찾지 못했습니다. 내 채널 페이지 주소나 스튜디오의 채팅창 URL을 붙여 넣으십시오.'; }
+    else if (chat) { m.className = 'msg ok'; m.textContent = '✓ 채팅창 주소로 인식했습니다. 방송이 시작되거나 끝나도 새 채팅방을 찾아 자동으로 다시 연결합니다. 이 주소는 내 채팅창의 열쇠이므로 남에게 보여 주지 마십시오.'; }
+    else { m.className = 'msg ok'; m.textContent = '✓ 채널을 인식했습니다 (' + id.slice(0, 6) + '…' + id.slice(-4) + '). 방송이 시작되거나 끝나도 자동으로 다시 연결합니다.'; }
     updateSummaries();
   }
 
@@ -280,7 +282,7 @@
     var s = S.status, d = s.detail || {};
     if (s.state === 'no-channel') { box.className = 'msg muted'; box.textContent = '채널 링크를 입력하면 자동으로 치지직 채팅에 연결합니다.'; }
     else if (s.state === 'connecting') { box.className = 'msg muted'; box.textContent = '연결하는 중… ' + (d.step || ''); }
-    else if (s.state === 'connected') { box.className = 'msg ok'; box.textContent = '✓ 치지직 채팅에 연결되었습니다 (' + (d.liveStatus === 'OPEN' ? '방송 중' : '방송 종료 상태') + '). 내 채팅창에 아무거나 쳐 보십시오. 아래에 나타나면 성공입니다.'; }
+    else if (s.state === 'connected') { box.className = 'msg ok'; box.textContent = '✓ 치지직 채팅에 연결되었습니다 (' + (d.liveStatus === 'OPEN' ? '방송 중' : d.liveStatus ? '방송 종료 상태' : '채팅창 주소로 연결') + '). 내 채팅창에 아무거나 쳐 보십시오. 아래에 나타나면 성공입니다.'; }
     else if (s.state === 'retry') { box.className = 'msg bad'; box.textContent = '✗ 연결하지 못했습니다: ' + d.message + (d.hint ? ' ' + d.hint : '') + ' (' + d.seconds + '초 뒤 다시 시도합니다)'; }
     updateSummaries();
   }
@@ -302,10 +304,10 @@
 
   function renderChannel() {
     var c = begin('s-channel', 'channel', '2. 내 채널');
-    c.appendChild(h('p', { class: 'lead', text: '내 치지직 채널 페이지 주소를 붙여 넣으십시오. 로그인은 필요 없습니다.' }));
-    c.appendChild(h('div', { class: 'row' }, field('내 채널 페이지 주소', text(S.cfg.channel.url, function (v) {
+    c.appendChild(h('p', { class: 'lead', text: '내 치지직 채널 페이지 주소나 스튜디오의 채팅창 URL을 붙여 넣으십시오. 로그인은 필요 없습니다.' }));
+    c.appendChild(h('div', { class: 'row' }, field('내 채널 페이지 주소 또는 채팅창 URL', text(S.cfg.channel.url, function (v) {
       S.cfg.channel.url = v; channelMsg(); changed();
-    }, { placeholder: 'https://chzzk.naver.com/내채널ID' }))));
+    }, { placeholder: 'https://chzzk.naver.com/내채널ID  또는  https://chzzk.naver.com/chat/…' }))));
     c.appendChild(h('p', { id: 'channelmsg', class: 'msg' }));
     channelMsg();
     c.appendChild(h('p', { id: 'connstatus', class: 'msg' }));

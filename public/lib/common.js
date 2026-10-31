@@ -58,7 +58,7 @@
   function defaultConfig() {
     return {
       version: CONFIG_VERSION,
-      channel: { url: '', channelId: '' },
+      channel: { url: '', channelId: '', chatKey: '' }, // 채팅창 주소(스튜디오의 chzzk.naver.com/chat/…)를 넣으면 channelId 대신 chatKey(위젯 키)를 씁니다.
       commands: [], // { triggers: ['~감사', '~땡큐'], image: '표정/감사.svg', height: '', match: 'anywhere', access: '' }  (height가 비어 있으면 기본 높이를 따릅니다)
       hidden: { commands: [], prefixes: [] },
       bbcode: { enabled: true, tags: {}, limits: JSON.parse(JSON.stringify(BB.DEFAULT_LIMITS)) },
@@ -233,7 +233,9 @@
     var L = d.bbcode.limits;
 
     var url = str(ch.url, 300, '').trim();
-    var channelId = parseChannelId(url) || (CHANNEL_ID_RE.test(ch.channelId || '') ? parseChannelId(ch.channelId) : '');
+    // 스튜디오의 채팅창 주소는 채널 ID가 아니라 채팅창 위젯 키입니다. 이 경우 channelId는 비우고 chatKey만 씁니다.
+    var chatKey = looksLikeChatLink(url) ? parseChannelId(url) : '';
+    var channelId = chatKey ? '' : (parseChannelId(url) || (CHANNEL_ID_RE.test(ch.channelId || '') ? parseChannelId(ch.channelId) : ''));
 
     var legacy = !(Number(c.version) >= CONFIG_VERSION);
     var collapsed = {};
@@ -241,7 +243,7 @@
 
     return {
       version: CONFIG_VERSION,
-      channel: { url: url, channelId: channelId },
+      channel: { url: url, channelId: channelId, chatKey: chatKey },
       commands: normalizeCommands(c.commands, legacy),
       hidden: { commands: strList(hid.commands, 100, 40), prefixes: strList(hid.prefixes, 20, 10) },
       bbcode: {

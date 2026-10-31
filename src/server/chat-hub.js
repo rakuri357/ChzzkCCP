@@ -22,16 +22,17 @@ class ChatHub extends EventEmitter {
 
   /** 설정이 바뀔 때마다 호출: 채널/접속 주소가 바뀌었을 때만 다시 접속 */
   apply(config) {
-    const key = JSON.stringify([config.channel.channelId, config.advanced]);
+    const key = JSON.stringify([config.channel.channelId, config.channel.chatKey || '', config.advanced]);
     if (key === this.key) return;
     this.key = key;
     this.stop();
     this.recent = [];
     const id = config.channel.channelId;
-    if (!id) { this._setStatus('no-channel'); return; }
+    const sourceKey = config.channel.chatKey || '';
+    if (!id && !sourceKey) { this._setStatus('no-channel'); return; }
     this._setStatus('connecting', { step: '채널 확인 중' });
     this.client = new ChzzkChat(Object.assign({
-      channelId: id,
+      channelId: id, sourceKey,
       apiBase: config.advanced.apiBase, commApiBase: config.advanced.commApiBase, wsUrl: config.advanced.wsUrl,
       headers: { 'User-Agent': BROWSER_UA, Accept: 'application/json' },
       WebSocketImpl: require('ws'),

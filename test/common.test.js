@@ -58,6 +58,19 @@ test('기본 태그 이름: 영문, 단축, 한글이 처음부터 켜져 있다
   assert.equal(dom('[굵게]x[/굵게] [rb]y', {}).querySelector('.bb-b').textContent, 'x');
 });
 
+test('채널 설정: 채널 페이지 주소는 channelId, 스튜디오의 채팅창 주소는 chatKey(위젯 키)로 저장한다', () => {
+  const id = '0123456789abcdef0123456789abcdef';
+  const page = L.normalizeConfig({ channel: { url: `https://chzzk.naver.com/${id}` } }).channel;
+  assert.deepEqual(page, { url: `https://chzzk.naver.com/${id}`, channelId: id, chatKey: '' });
+  const chat = L.normalizeConfig({ channel: { url: `https://chzzk.naver.com/chat/${id}` } }).channel;
+  assert.deepEqual(chat, { url: `https://chzzk.naver.com/chat/${id}`, channelId: '', chatKey: id });
+  assert.deepEqual(L.normalizeConfig({ channel: { url: 'https://chzzk.naver.com/chat/abc123' } }).channel, { url: 'https://chzzk.naver.com/chat/abc123', channelId: '', chatKey: '' }, '32자리가 아니면 둘 다 비움');
+  assert.deepEqual(L.normalizeConfig(null).channel, { url: '', channelId: '', chatKey: '' });
+  // 예전 설정(chatKey 없음)과 주소를 바꾼 경우
+  assert.equal(L.normalizeConfig({ channel: { url: '', channelId: id } }).channel.channelId, id);
+  assert.equal(L.normalizeConfig({ channel: { url: `https://chzzk.naver.com/${id}`, chatKey: 'zzz' } }).channel.chatKey, '', '저장된 chatKey보다 주소를 따른다');
+});
+
 test('명령어 검사: 띄어쓰기/대괄호/중복/개수', () => {
   const t20 = Array.from({ length: 25 }, (_, i) => '~a' + i);
   const c = L.normalizeConfig({ commands: [
