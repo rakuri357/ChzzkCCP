@@ -71,7 +71,7 @@
       // 일반 시청자/구독자가 쓸 수 있는 기능. 기능마다 따로 정하지 않으면 이 기본 권한을 따릅니다. (스트리머와 운영진은 항상 모두 쓸 수 있습니다.)
       permissions: { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide' },
       order: {},   // 같은 태그 안에서 내가 정한 채팅콘 순서: { 태그: [이미지 경로…] }. 시청자용 명령어 페이지에 그대로 적용됩니다.
-      ui: { collapsed: {}, imageSort: 'name', autoCommand: true }
+      ui: { collapsed: {}, imageSort: 'name', autoCommand: true, updateCheck: true, updateDismissed: '' }
     };
   }
 
@@ -312,7 +312,7 @@
         deniedMode: DENIED_MODES.indexOf(perm.deniedMode) >= 0 ? perm.deniedMode : 'hide'
       },
       order: normalizeOrder(c.order),
-      ui: { collapsed: collapsed, imageSort: IMAGE_SORTS.indexOf(ui.imageSort) >= 0 ? ui.imageSort : 'name', autoCommand: bool(ui.autoCommand, true) }
+      ui: { collapsed: collapsed, imageSort: IMAGE_SORTS.indexOf(ui.imageSort) >= 0 ? ui.imageSort : 'name', autoCommand: bool(ui.autoCommand, true), updateCheck: bool(ui.updateCheck, true), updateDismissed: str(ui.updateDismissed, 20, '').replace(/[^0-9.]/g, '') }
     };
   }
 

@@ -8,6 +8,7 @@ const fs = require('fs');
 const { app, BrowserWindow, Menu, Tray, nativeImage, clipboard, session, shell, dialog } = require('electron');
 const { startServer } = require('../server/server');
 const APP = require('../server/app-info');
+const obsGuard = require('./obs-guard');
 
 const ASSETS = path.join(__dirname, '..', '..', 'assets');
 const startHidden = process.argv.includes('--hidden');
@@ -18,6 +19,7 @@ let win = null;
 let tray = null;
 let running = null;
 let quitting = false;
+let trayNoticeShown = false;
 
 // 이미지와 설정은 실행 파일 옆의 폴더에 저장합니다. (포터블: 폴더째 옮기면 설정도 같이 갑니다.) 쓸 수 없으면 사용자 데이터 폴더.
 // 예전 이름의 폴더(chzzk-overlay-data)가 있으면 새 이름으로 바꿔서 설정과 이미지를 그대로 이어 씁니다.
@@ -92,6 +94,19 @@ function openWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e, url) => { if (!isOurPage(url)) { e.preventDefault(); if (/^https?:\/\//.test(url)) shell.openExternal(url); } });
   win.on('closed', () => { win = null; });
+  // OBS가 켜져 있으면 창을 닫아도 앱을 끄지 않고 트레이로 숨깁니다. (OBS에 채팅을 계속 보내야 하기 때문)
+  // 창을 먼저 연 일반 실행에서도 똑같이 동작하고, 숨겨 둔 동안 OBS가 꺼지면 앱도 함께 끕니다.
+  win.on('close', (e) => {
+    if (quitting || startHidden || !tray) return;   // 숨김 실행은 아래 window-all-closed가 따로 처리, 트레이가 없으면 다시 열 방법이 없어서 숨기지 않음
+    if (!obsGuard.isObsRunningSync()) return;
+    e.preventDefault();
+    win.hide();
+    if (!trayNoticeShown) {
+      trayNoticeShown = true;
+      try { tray.displayBalloon({ title: APP.NAME, content: 'OBS가 켜져 있어서 창만 닫고 트레이에서 계속 실행합니다. OBS를 끄면 함께 종료됩니다.' }); } catch { /* 안내를 못 보여 줘도 동작에는 영향이 없음 */ }
+    }
+    obsHideGuard.start();
+  });
   return win;
 }
 
@@ -99,6 +114,13 @@ async function createWindow() {
   openWindow();
   await win.loadURL(running.url + '/input.html');
 }
+
+// 창을 숨겨 둔 동안 OBS가 꺼졌는지 지켜봅니다. (창이 다시 보이는 동안에는 OBS가 꺼져도 앱을 끄지 않음)
+const obsHideGuard = obsGuard.createGuard({
+  isHidden: () => !win || !win.isVisible(),
+  isRunning: () => obsGuard.isObsRunning(),
+  onGone: () => quitApp()
+});
 
 function showWindow() {
   if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); return; }
@@ -123,6 +145,7 @@ function createTray() {
 
 function quitApp() {
   quitting = true;
+  obsHideGuard.stop();
   app.quit();
 }
 
@@ -140,6 +163,8 @@ if (!gotLock) {
       running = await startServer({
         dataDir: pickDataDir(),
         mirrorDir: bridge,
+        bridgeDir: bridge,
+        appVersion: app.getVersion(),
         openFolder: (dir) => shell.openPath(dir),
         onQuit: quitApp
       });

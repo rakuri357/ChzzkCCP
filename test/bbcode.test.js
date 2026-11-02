@@ -277,7 +277,7 @@ test('물결과 타자기는 글자마다 나뉘고, 타자기는 3초 안에 �
   assert.equal(cs[0].style.animationDelay, '0.00s');
 });
 
-test('회전, 두근두근은 움직이는 효과 한도에 걸린다', () => {
+test('회전, 펄스는 움직이는 효과 한도에 걸린다', () => {
   const box = dom('[spin]a[/spin][pulse]b[/pulse][wave]c[/wave][type]d[/type]');
   assert.equal(box.querySelectorAll('.bb-spin, .bb-pulse, .bb-wave').length, 3);
   assert.equal(box.querySelector('.bb-type'), null);

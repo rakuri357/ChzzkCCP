@@ -13,10 +13,18 @@ class ChatHub extends EventEmitter {
     this.client = null;
     this.recent = [];
     this.status = { state: 'no-channel', detail: {} };
+    this.history = [];   // 진단용: 최근 연결 상태 변화(시각, 상태, 오류 종류와 내용)
   }
 
   _setStatus(state, detail) {
-    this.status = { state, detail: detail || {} };
+    const last = this.history[this.history.length - 1];
+    const d = detail || {};
+    // 같은 상태가 이어지는 단계 표시(접속 중 등)는 기록하지 않고, 상태가 바뀌었거나 오류일 때만 남깁니다.
+    if (!last || last.state !== state || state === 'retry') {
+      this.history.push({ time: Date.now(), state, kind: d.kind || '', message: d.message || '' });
+      if (this.history.length > 20) this.history.shift();
+    }
+    this.status = { state, detail: d };
     this.emit('status', this.status);
   }
 

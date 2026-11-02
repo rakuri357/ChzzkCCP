@@ -227,6 +227,18 @@ test('페이지: BBCode 샘플이 실제로 꾸며져 보이고, 움직임은 �
   assert.ok(!row.querySelector('.sample').classList.contains('play'));
 });
 
+test('페이지: BBCode 줄에는 구독자 표시만 붙고, 움직임/값이 바뀜 표시는 없다', () => {
+  const { doc } = openPage();
+  const badges = [...doc.querySelectorAll('.bbrow .badge')].map((b) => b.textContent);
+  assert.ok(badges.length >= 1 && badges.every((t) => t === '구독자'), '구독자 표시만: ' + badges.join(','));
+  assert.equal(rowOf(doc, '무지개').querySelector('.badge').textContent, '구독자', '구독자 전용 태그에는 표시');
+  assert.equal(rowOf(doc, '굵게').querySelector('.badge'), null);
+  assert.equal(rowOf(doc, '글자 색').querySelector('.badge'), null, '값이 바뀜 표시 없음');
+  assert.equal(rowOf(doc, '네온').querySelector('.badge'), null, '움직임 표시 없음');
+  assert.ok(rowOf(doc, '펄스'), '펄스 태그의 표시 이름');
+  assert.equal(rowOf(doc, '두근두근'), undefined);
+});
+
 test('페이지: 소제목은 BBCode (글자 꾸미기)이고, 이름은 눌리는 버튼이 아니라 줄 전체가 버튼이다', () => {
   const { doc } = openPage();
   assert.equal(doc.querySelector('#bbsec h2').textContent, 'BBCode (글자 꾸미기)');

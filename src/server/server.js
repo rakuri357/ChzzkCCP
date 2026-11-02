@@ -10,6 +10,9 @@ const { ChatHub } = require('./chat-hub');
 const Lite = require('../../public/lib/common');
 const APP = require('./app-info');
 const { exportPage } = require('./export-page');
+const os = require('os');
+const { buildDiagnostics } = require('./diagnostics');
+const updateCheck = require('./update-check');
 
 const PUBLIC = path.join(__dirname, '..', '..', 'public');
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -72,6 +75,19 @@ async function startServer(options = {}) {
   hub.on('chat', (ev) => broadcast({ type: 'chat', msg: ev }));
   hub.on('status', (s) => broadcast({ type: 'status', status: s }));
 
+  // ---------- 새 버전 확인 ----------
+  // 설정에서 켜 둔 동안 시작할 때와 6시간마다 GitHub의 최신 릴리스를 조회합니다. 실패해도 조용히 넘어갑니다.
+  const appVersion = options.appVersion || require('../../package.json').version;
+  let updateInfo = null;
+  let updateTimer = null, updateFirst = null;
+  async function runUpdateCheck() {
+    if (store.config.ui.updateCheck === false) return;
+    try {
+      updateInfo = Object.assign(await updateCheck.checkLatest({ apiUrl: options.updateApiUrl, current: appVersion, timeoutMs: options.updateTimeoutMs }), { checkedAt: Date.now() });
+      broadcast({ type: 'update', update: updateInfo });
+    } catch { /* 확인하지 못해도 앱 사용에는 영향이 없습니다. */ }
+  }
+
   // 탐색기에서 이미지를 다른 폴더로 옮긴 경우 명령어가 가리키는 경로를 자동으로 고치고, 오버레이에도 알립니다.
   function relink() {
     if (store.relinkCommands()) broadcast({ type: 'config', config: store.config });
@@ -89,6 +105,8 @@ async function startServer(options = {}) {
       recent: hub.recent.slice(-10),
       dataDir: store.dataDir,
       urls: { overlay: `http://${host}/output.html` },
+      update: updateInfo,
+      version: appVersion,
       canOpenFolder: typeof options.openFolder === 'function'
     };
   }
@@ -100,10 +118,24 @@ async function startServer(options = {}) {
     if (p === '/api/config' && req.method === 'PUT') {
       let body;
       try { body = JSON.parse((await readBody(req, 1024 * 1024)).toString('utf8')); } catch (e) { return sendJson(res, e.status || 400, { error: '설정 형식이 올바르지 않습니다.' }); }
+      const wasUpdateOn = store.config.ui.updateCheck !== false;
       const cfg = store.save(body);
       hub.apply(cfg);
+      if (!wasUpdateOn && cfg.ui.updateCheck !== false) runUpdateCheck();   // 알림을 다시 켜면 바로 확인
       broadcast({ type: 'config', config: cfg });
       return sendJson(res, 200, cfg);
+    }
+
+    // 문제가 생겼을 때 알려 줄 진단 정보 (채널 주소, 채팅창 열쇠, 닉네임, 채팅 내용은 담지 않습니다.)
+    if (p === '/api/diagnostics' && req.method === 'GET') {
+      let launcher = false;
+      if (options.bridgeDir) { try { launcher = fs.existsSync(path.join(options.bridgeDir, APP.LAUNCHER)); } catch { /* 확인하지 못하면 없음으로 */ } }
+      return sendJson(res, 200, { text: buildDiagnostics({
+        app: APP.NAME, version: appVersion, versions: { electron: process.versions.electron, chrome: process.versions.chrome, node: process.versions.node },
+        platform: os.platform(), release: os.release(), arch: os.arch(), dataDir: store.dataDir, port: actualPort,
+        status: hub.status, history: hub.history, config: store.config, images: store.listImages().length, folders: store.listFolders().length,
+        bridge: options.bridgeDir ? { launcher } : null, update: updateInfo, now: Date.now()
+      }) });
     }
 
     if (p === '/api/images' && req.method === 'POST') {
@@ -270,11 +302,16 @@ async function startServer(options = {}) {
   const runtimeTimer = setInterval(writeRuntime, 5000);
   runtimeTimer.unref();
 
+  updateFirst = setTimeout(runUpdateCheck, options.updateFirstDelayMs == null ? 5000 : options.updateFirstDelayMs);
+  updateTimer = setInterval(runUpdateCheck, options.updateIntervalMs || 6 * 60 * 60 * 1000);
+  updateFirst.unref(); updateTimer.unref();
+
   return {
     server, store, hub, port: actualPort,
     url: `http://localhost:${actualPort}`,
     close: async () => {
       clearInterval(runtimeTimer);
+      clearTimeout(updateFirst); clearInterval(updateTimer);
       try { fs.unlinkSync(runtimeFile); } catch { /* 이미 없음 */ }
       removeMirror();
       hub.stop();

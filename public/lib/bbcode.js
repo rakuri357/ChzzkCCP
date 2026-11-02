@@ -46,7 +46,7 @@
     float   : { label: '둥실', arg: 'none', effect: true, names: ['float', 'ft', '둥실'], example: '[float]둥실둥실[/float]' },
     jelly   : { label: '젤리', arg: 'none', effect: true, names: ['jelly', 'jl', '젤리'], example: '[jelly]말랑말랑[/jelly]' },
     stretch : { label: '고무줄', arg: 'none', effect: true, names: ['stretch', 'sc', '고무줄'], example: '[stretch]쭈우욱[/stretch]' },
-    pulse   : { label: '두근두근', arg: 'none', effect: true, names: ['pulse', 'pl', '맥박', '펄스'], example: '[pulse]두근[/pulse]' },
+    pulse   : { label: '펄스', arg: 'none', effect: true, names: ['pulse', 'pl', '맥박', '펄스'], example: '[pulse]두근[/pulse]' },
     beat    : { label: '심장박동', arg: 'none', effect: true, names: ['beat', 'bt', '심장', '두근'], example: '[beat]두근두근[/beat]' },
     type    : { label: '타자기', arg: 'none', effect: true, names: ['type', 'ty', '타자', '타닥'], example: '[type]타닥타닥[/type]' },
     marquee : { label: '흐르는 글자', arg: 'none', effect: true, names: ['marquee', 'mq', '흐름', '마퀴'], example: '[marquee]흘러간다[/marquee]' }

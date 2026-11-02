@@ -105,6 +105,7 @@
       if (m.type === 'status') { S.status = m.status; renderConn(); }
       else if (m.type === 'chat') { S.recent.push(m.msg); if (S.recent.length > 10) S.recent.shift(); renderRecent(); }
       else if (m.type === 'recent') { S.recent = m.list; renderRecent(); }
+      else if (m.type === 'update') { S.update = m.update; renderUpdate(); }
     };
     ws.onclose = function () { wsRetry++; setTimeout(connectWs, Math.min(5000, 500 * wsRetry)); };
     ws.onerror = function () { try { ws.close(); } catch (e) { /* 무시 */ } };
@@ -1175,7 +1176,8 @@
     c.appendChild(h('div', { class: 'checks' },
       check('치지직 뱃지 보이기', o.showBadges, function (on) { o.showBadges = on; changed(); }),
       check('닉네임 보이기', o.showNickname, function (on) { o.showNickname = on; changed(); }),
-      check('연결 상태 안내를 화면에 보이기 (연결 중/실패일 때만)', o.showStatus, function (on) { o.showStatus = on; changed(); })));
+      check('연결 상태 안내를 화면에 보이기 (연결 중/실패일 때만)', o.showStatus, function (on) { o.showStatus = on; changed(); }),
+      check('새 버전 알림 (켜 두면 앱이 GitHub에 접속해서 최신 버전을 확인합니다)', S.cfg.ui.updateCheck !== false, function (on) { S.cfg.ui.updateCheck = on; renderUpdate(); changed(); })));
   }
 
   // ---------- 화면: 고급 ----------
@@ -1220,6 +1222,39 @@
     }).catch(function () { /* 다음에 다시 */ });
   });
 
+  // ---------- 새 버전 안내 / 진단 정보 ----------
+  // 새 버전이 있고, 알림이 켜져 있고, 이 버전을 "다시 알리지 않기"로 하지 않았을 때만 위쪽에 안내 줄을 보여 줍니다.
+  function renderUpdate() {
+    var bar = $('updatebar'), u = S.update;
+    if (!bar) return;
+    var show = !!(u && u.newer && S.cfg && S.cfg.ui.updateCheck !== false && S.cfg.ui.updateDismissed !== u.latest);
+    bar.hidden = !show;
+    bar.textContent = '';
+    if (!show) return;
+    bar.appendChild(h('span', { text: '새 버전 ' + u.latest + '이(가) 있습니다. (지금 ' + u.current + ')' }));
+    bar.appendChild(h('a', { href: u.url, target: '_blank', rel: 'noopener', text: '내려받는 곳 열기' }));
+    bar.appendChild(h('button', { type: 'button', class: 'small', text: '이 버전은 다시 알리지 않기', onclick: function () {
+      S.cfg.ui.updateDismissed = u.latest; renderUpdate(); changed();
+    } }));
+  }
+  $('diag').addEventListener('click', function () {
+    api('GET', '/api/diagnostics').then(function (r) {
+      return copyText(r.text).then(function () { toast('진단 정보를 복사했습니다. 문제를 알려 줄 때 붙여 넣으십시오.'); });
+    }).catch(function (e) { toast('진단 정보를 복사하지 못했습니다: ' + e.message, true); });
+  });
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('복사가 허용되지 않았습니다'));
+    });
+  }
+
   $('collapseAll').addEventListener('click', function () { setAllSections(true); });
   $('expandAll').addEventListener('click', function () { setAllSections(false); });
 
@@ -1227,8 +1262,9 @@
   api('GET', '/api/state').then(function (st) {
     S.cfg = L.normalizeConfig(st.config);
     S.images = st.images; S.folders = st.folders || []; S.status = st.status; S.recent = st.recent || [];
-    S.dataDir = st.dataDir; S.urls = st.urls; S.canOpenFolder = st.canOpenFolder;
+    S.dataDir = st.dataDir; S.urls = st.urls; S.canOpenFolder = st.canOpenFolder; S.update = st.update || null;
     renderAll();
+    renderUpdate();
     setChip('ok', '자동 저장');
     connectWs();
   }).catch(function (e) {

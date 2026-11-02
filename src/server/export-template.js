@@ -275,7 +275,6 @@ code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--ac
       default: return '[' + t.copy + ']';
     }
   }
-  var randomArgs = { 'color': 1, 'color?': 1, 'colors': 1, 'size': 1 };
 
   var tagsInfo = data.bbtags || [];
   if (tagsInfo.length && window.ChatMarkup) {
@@ -289,9 +288,7 @@ code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--ac
       row.type = 'button';
       row.setAttribute('aria-label', t.label + ' 태그 복사');
       var name = el('span', 'bbname', t.label);
-      if (t.effect) name.appendChild(el('span', 'badge', '움직임'));
       if (t.subscriber) name.appendChild(el('span', 'badge', '구독자'));
-      if (randomArgs[t.arg]) name.appendChild(el('span', 'badge', '값이 바뀜'));
       row.appendChild(name);
       var names = el('span');
       t.names.forEach(function (n, i) {
