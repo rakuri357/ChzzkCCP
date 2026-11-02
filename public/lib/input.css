@@ -10,6 +10,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-size: 15px; lin
 .top-in { max-width: 1180px; margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
 .top h1 { font-size: 18px; margin: 0; margin-right: auto; letter-spacing: -0.01em; }
 button.small { padding: 5px 12px; font-size: 13px; }
+.appver { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 6px; }
 .updatebar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; max-width: 1180px; margin: 10px auto 0; padding: 10px 16px; background: var(--accent-soft); color: var(--ink); border-radius: 10px; font-weight: 600; }
 .updatebar[hidden] { display: none; }
 .updatebar a { color: var(--accent); font-weight: 800; }
@@ -221,3 +222,15 @@ button.small:disabled { opacity: .45; }
 .permrow .link { font-size: 12px; padding: 0; }
 .permrow .link[hidden] { display: none; }
 .rolelabel { color: var(--accent); font-weight: 800; }
+
+/* 단락 제목 줄: 배경색으로 눌러서 접는 곳임을 알려줍니다 */
+.sechead-row { background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; margin: -6px -8px 0; transition: background .12s; }
+.sechead-row:hover { background: #dadefb; }
+.sechead-row .sechead { border-radius: 8px; }
+
+/* 6번 패널: 접히는 목록과 한도 상자 */
+.subhead { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-radius: 8px; background: #f3f4fb; color: var(--ink); font-weight: 700; }
+.subhead:hover { border: 0; background: var(--accent-soft); }
+.subhead .permtitle { font-size: 15px; }
+.permfold .permbar { margin-top: 10px; }
+.permtag { margin: 12px 0 2px; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 800; width: fit-content; }

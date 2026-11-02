@@ -126,3 +126,62 @@ test('설정: 새 버전 알림은 기본으로 켜져 있고, 다시 알리지 
   assert.equal(L.normalizeConfig({ ui: { updateDismissed: '0.4.9' } }).ui.updateDismissed, '0.4.9');
   assert.equal(L.normalizeConfig({ ui: { updateDismissed: '<b>0.4.9</b>' } }).ui.updateDismissed, '0.4.9');
 });
+
+test('알림 판단(flags): 새 버전이고 알림이 켜져 있고 다시 알리지 않기가 아니면 보이고, 같은 버전은 말풍선을 한 번만 낸다', () => {
+  const info = { latest: '0.4.9', newer: true };
+  assert.deepEqual(U.flags({}, info), { show: true, notify: true });
+  assert.deepEqual(U.flags({ updateNotified: '0.4.9' }, info), { show: true, notify: false }, '이미 말풍선으로 알렸음');
+  assert.deepEqual(U.flags({ updateNotified: '0.4.8' }, info), { show: true, notify: true }, '예전 버전을 알린 기록은 상관없음');
+  assert.deepEqual(U.flags({ updateDismissed: '0.4.9' }, info), { show: false, notify: false }, '다시 알리지 않기');
+  assert.deepEqual(U.flags({ updateCheck: false }, info), { show: false, notify: false }, '알림을 끔');
+  assert.deepEqual(U.flags({}, { latest: '0.4.8', newer: false }), { show: false, notify: false });
+  assert.deepEqual(U.flags({}, null), { show: false, notify: false });
+});
+
+test('새 버전 확인은 켤 때 한 번만 하고, 트레이용 알림 정보를 한 번만 보낸다', async (t) => {
+  const gh = await fakeGithub('v0.4.9'); t.after(gh.close);
+  const calls = [];
+  const app = await startWith(t, gh, { updateIntervalMs: 30, onUpdate: (u) => calls.push(u) });
+  await waitFor(() => calls.length >= 1);
+  await new Promise((r) => setTimeout(r, 400));        // 예전에는 이 사이에 반복해서 확인했음
+  assert.equal(gh.hits.length, 1, '반복해서 확인하지 않는다');
+  assert.equal(calls[0].latest, '0.4.9');
+  assert.equal(calls[0].show, true);
+  assert.equal(calls[0].notify, true);
+  app.markUpdateNotified('0.4.9');
+  assert.equal(app.store.config.ui.updateNotified, '0.4.9', '알린 버전을 설정에 남긴다');
+});
+
+test('이미 말풍선으로 알린 버전은 다시 켜도 말풍선을 내지 않는다 (트레이 메뉴는 계속 보임)', async (t) => {
+  const gh = await fakeGithub('v0.4.9'); t.after(gh.close);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upd3-'));
+  const first = await startServer({ dataDir: dir, port: 0, appVersion: '0.4.8', updateApiUrl: gh.api, updateFirstDelayMs: 1e9 });
+  first.markUpdateNotified('0.4.9');
+  await first.close();
+  const calls = [];
+  const app = await startServer({ dataDir: dir, port: 0, appVersion: '0.4.8', updateApiUrl: gh.api, updateFirstDelayMs: 20, onUpdate: (u) => calls.push(u) });
+  t.after(() => app.close());
+  await waitFor(() => calls.length >= 1);
+  assert.equal(calls[0].show, true, '메뉴 항목과 안내 줄은 보임');
+  assert.equal(calls[0].notify, false, '말풍선은 이미 알렸으니 내지 않음');
+});
+
+test('설정에서 "다시 알리지 않기"를 누르면 트레이 쪽에도 바로 알린다', async (t) => {
+  const gh = await fakeGithub('v0.4.9'); t.after(gh.close);
+  const calls = [];
+  const app = await startWith(t, gh, { onUpdate: (u) => calls.push(u) });
+  await waitFor(() => calls.length >= 1);
+  const st = await getState(app);
+  await fetch(`http://127.0.0.1:${app.port}/api/config`, { method: 'PUT', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...st.config, ui: { ...st.config.ui, updateDismissed: '0.4.9' } }) });
+  await waitFor(() => calls.length >= 2);
+  const last = calls[calls.length - 1];
+  assert.equal(last.show, false);
+  assert.equal(last.notify, false);
+});
+
+test('설정: 말풍선으로 알린 버전은 숫자와 점만 저장한다', () => {
+  const L = require('../public/lib/common');
+  assert.equal(L.normalizeConfig(null).ui.updateNotified, '');
+  assert.equal(L.normalizeConfig({ ui: { updateNotified: '0.4.9' } }).ui.updateNotified, '0.4.9');
+  assert.equal(L.normalizeConfig({ ui: { updateNotified: '<x>0.4.9' } }).ui.updateNotified, '0.4.9');
+});

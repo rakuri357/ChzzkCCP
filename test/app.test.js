@@ -69,7 +69,8 @@ test('첫 실행은 빈 상태로 시작하고, 설정 저장, 치지직 접속�
   // 채널 링크 저장 → 자동 접속
   const saved = await putConfig(app.port, { ...st0.config, channel: { url: `https://chzzk.naver.com/${CH}` }, hidden: { commands: ['!목록'], prefixes: [] } });
   assert.equal(saved.status, 200);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')).channel.channelId, CH);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'channel.json'), 'utf8')).channelId, CH, '채널 정보는 channel.json에 저장');
+  assert.ok(!('channel' in JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'))), 'config.json에는 채널 정보가 없다');
   await waitFor(() => got.some((m) => m.type === 'status' && m.status.state === 'connected'));
   assert.equal(got.filter((m) => m.type === 'config').length, 2, '저장하면 오버레이에 새 설정이 전달됨');
 
@@ -194,8 +195,9 @@ test('스튜디오의 채팅창 주소를 넣으면 위젯 키로 접속하고, 
   await waitFor(() => fake.state.sockets.size === 1);
   fake.emit({ msg: '방송 중' });
   await waitFor(() => got.find((m) => m.type === 'chat' && m.msg.content === '방송 중'));
-  const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'));
-  assert.equal(cfg.channel.chatKey, WIDGET_KEY);
+  const cfg = JSON.parse(fs.readFileSync(path.join(dir, 'channel.json'), 'utf8'));
+  assert.equal(cfg.chatKey, WIDGET_KEY);
+  assert.ok(!fs.readFileSync(path.join(dir, 'config.json'), 'utf8').includes(WIDGET_KEY), '열쇠는 config.json에 들어가지 않는다');
   ws.close();
 });
 

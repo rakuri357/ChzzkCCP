@@ -63,15 +63,15 @@
       hidden: { commands: [], prefixes: [] },
       bbcode: { enabled: true, tags: {}, limits: JSON.parse(JSON.stringify(BB.DEFAULT_LIMITS)), overflowMode: 'hide' }, // overflowMode: 한도를 넘은 부분을 숨길지(hide) 쓴 글자 그대로 둘지(show)
       overlay: {
-        maxLines: 14, fontSize: 24, lineLifetimeSec: 10, fadeTopPx: 24, fadeTopOpacity: 50, showBadges: true, showNickname: true, showStatus: true,
+        maxLines: 14, fontSize: 24, lineGap: 8, lineLifetimeSec: 10, fadeTopPx: 24, fadeTopOpacity: 50, showBadges: true, showNickname: true, showStatus: true,
         textColor: '#ffffff', outlineColor: '#000000', backgroundColor: 'rgba(0,0,0,0)', fontFamily: '',
         imageHeight: DEFAULT_IMAGE_HEIGHT   // 명령어 이미지의 기본 높이 (글자 크기 기준). 이미지마다 따로 정하지 않으면 이 값을 씁니다.
       },
       advanced: { apiBase: '', commApiBase: '', wsUrl: '' },
       // 일반 시청자/구독자가 쓸 수 있는 기능. 기능마다 따로 정하지 않으면 이 기본 권한을 따릅니다. (스트리머와 운영진은 항상 모두 쓸 수 있습니다.)
-      permissions: { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide' },
+      permissions: { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide', cooldownImg: 0, cooldownBb: 30, cooldownSubImg: 0, cooldownSubBb: 30 },   // 쿨타임(초): 같은 시청자가 채팅콘, BBCode를 다시 쓸 수 있을 때까지. 일반 시청자와 구독자를 따로 정함. 0이면 끔
       order: {},   // 같은 태그 안에서 내가 정한 채팅콘 순서: { 태그: [이미지 경로…] }. 시청자용 명령어 페이지에 그대로 적용됩니다.
-      ui: { collapsed: {}, imageSort: 'name', autoCommand: true, updateCheck: true, updateDismissed: '' }
+      ui: { collapsed: {}, imageSort: 'name', autoCommand: true, updateCheck: true, updateDismissed: '', updateNotified: '' }
     };
   }
 
@@ -248,6 +248,13 @@
     return i < 0 ? 1e9 : i;
   }
 
+  /** 오버레이 화면에는 채널 주소와 채팅창 열쇠가 필요 없으므로 빼고 보냅니다. */
+  function publicConfig(cfg) {
+    var c = JSON.parse(JSON.stringify(cfg || {}));
+    c.channel = { url: '', channelId: '', chatKey: '' };
+    return c;
+  }
+
   // ---------- 설정 정리 ----------
   /** 어떤 값이 들어와도 안전한 설정으로 바꿉니다 (잘못된 값은 기본값/한도 안으로). */
   function normalizeConfig(raw) {
@@ -289,6 +296,7 @@
       overlay: {
         maxLines: Math.round(num(ov.maxLines, 1, 100, d.overlay.maxLines)),
         fontSize: Math.round(num(ov.fontSize, 10, 120, d.overlay.fontSize)),
+        lineGap: Math.round(num(ov.lineGap, 0, 60, d.overlay.lineGap)),   // 채팅 줄과 줄 사이 간격(px)
         lineLifetimeSec: Math.round(num(ov.lineLifetimeSec, 0, 3600, d.overlay.lineLifetimeSec)),
         fadeTopPx: Math.round(num(ov.fadeTopPx, 0, 400, d.overlay.fadeTopPx)),            // 채팅창 맨 위를 흐리게 하는 높이(px). 0이면 끔
         fadeTopOpacity: Math.round(num(ov.fadeTopOpacity, 0, 100, d.overlay.fadeTopOpacity)), // 맨 위 가장자리가 얼마나 보일지(%)
@@ -309,10 +317,14 @@
       permissions: {
         imageAccess: ACCESS.indexOf(perm.imageAccess) >= 0 ? perm.imageAccess : 'all',
         tagAccess: ACCESS.indexOf(perm.tagAccess) >= 0 ? perm.tagAccess : 'all',
-        deniedMode: DENIED_MODES.indexOf(perm.deniedMode) >= 0 ? perm.deniedMode : 'hide'
+        deniedMode: DENIED_MODES.indexOf(perm.deniedMode) >= 0 ? perm.deniedMode : 'hide',
+        cooldownImg: Math.round(num(perm.cooldownImg, 0, 600, d.permissions.cooldownImg)),
+        cooldownBb: Math.round(num(perm.cooldownBb, 0, 600, d.permissions.cooldownBb)),
+        cooldownSubImg: Math.round(num(perm.cooldownSubImg, 0, 600, d.permissions.cooldownSubImg)),
+        cooldownSubBb: Math.round(num(perm.cooldownSubBb, 0, 600, d.permissions.cooldownSubBb))
       },
       order: normalizeOrder(c.order),
-      ui: { collapsed: collapsed, imageSort: IMAGE_SORTS.indexOf(ui.imageSort) >= 0 ? ui.imageSort : 'name', autoCommand: bool(ui.autoCommand, true), updateCheck: bool(ui.updateCheck, true), updateDismissed: str(ui.updateDismissed, 20, '').replace(/[^0-9.]/g, '') }
+      ui: { collapsed: collapsed, imageSort: IMAGE_SORTS.indexOf(ui.imageSort) >= 0 ? ui.imageSort : 'name', autoCommand: bool(ui.autoCommand, true), updateCheck: bool(ui.updateCheck, true), updateDismissed: str(ui.updateDismissed, 20, '').replace(/[^0-9.]/g, ''), updateNotified: str(ui.updateNotified, 20, '').replace(/[^0-9.]/g, '') }
     };
   }
 
@@ -351,7 +363,7 @@
       tagAccess[canon] = (cfg.bbcode.tags[canon] && cfg.bbcode.tags[canon].access) || cfg.permissions.tagAccess;
       names[canon].forEach(function (n) { aliases[n] = canon; });
     });
-    return { cmds: cmds, tags: tags, tagAccess: tagAccess, aliases: aliases, deniedMode: cfg.permissions.deniedMode, overflowMode: cfg.bbcode.overflowMode, limits: cfg.bbcode.limits, hiddenCommands: cfg.hidden.commands, hiddenPrefixes: cfg.hidden.prefixes };
+    return { cmds: cmds, tags: tags, tagAccess: tagAccess, aliases: aliases, deniedMode: cfg.permissions.deniedMode, cooldownImg: cfg.permissions.cooldownImg, cooldownBb: cfg.permissions.cooldownBb, cooldownSubImg: cfg.permissions.cooldownSubImg, cooldownSubBb: cfg.permissions.cooldownSubBb, overflowMode: cfg.bbcode.overflowMode, limits: cfg.bbcode.limits, hiddenCommands: cfg.hidden.commands, hiddenPrefixes: cfg.hidden.prefixes };
   }
 
   function isHidden(text, d) {
@@ -376,8 +388,34 @@
     return 'hsl(' + (h % 360) + ' 85% 74%)';
   }
 
+  // ---------- 쿨타임 (같은 시청자가 BBCode, 채팅콘을 연달아 쓰는 도배를 막음) ----------
+  /** 시청자별 마지막 사용 시각을 기억합니다. 오버레이 페이지가 열려 있는 동안만 유지됩니다. */
+  function createCooldown(opts) {
+    var now = (opts && opts.now) || function () { return Date.now(); };
+    var last = { bb: {}, img: {} };
+    function key(ev) { return String((ev && (ev.userId || ev.nickname)) || ''); }
+    return {
+      /** 이 시청자가 지금 쿨타임 중인지 (sec가 0이면 쿨타임 없음) */
+      cooling: function (kind, ev, sec) {
+        if (!(sec > 0) || !key(ev)) return false;
+        var t = last[kind][key(ev)];
+        return t != null && now() - t < sec * 1000;
+      },
+      /** 이 시청자가 방금 썼음을 기록하고, 오래된 기록은 정리합니다. */
+      mark: function (kind, ev) {
+        var k = key(ev); if (!k) return;
+        var t = now(); last[kind][k] = t;
+        var keys = Object.keys(last[kind]);
+        if (keys.length > 500) keys.forEach(function (x) { if (t - last[kind][x] > 600000) delete last[kind][x]; });
+      }
+    };
+  }
+  function hasNode(nodes, type) {
+    return nodes.some(function (n) { return n.type === type || (n.children && hasNode(n.children, type)); });
+  }
+
   /** 채팅 한 줄(DOM)을 만듭니다. 권한 때문에 보여 줄 내용이 없어지면 null을 돌려줍니다. ev = { nickname, role, userId, badges, titleColor, content, emojis } */
-  function renderLine(ev, d, doc) {
+  function renderLine(ev, d, doc, cool) {
     var line = doc.createElement('div');
     line.className = 'line';
 
@@ -414,9 +452,19 @@
       if (allowedFor(d.tagAccess[t], ev)) tags.push(t);
       else if (hideDenied && d.tagAccess[t] === 'subscribers') deniedTags.push(t);
     });
+    // 쿨타임: 스트리머와 운영진은 제외. 일반 시청자와 구독자는 따로 정한 시간을 씁니다. 쿨타임 중에는 꾸밈과 채팅콘 글자만 지우고 글은 평범하게 보여 줍니다.
+    var coolable = !!cool && !isStaff(ev);
+    var secImg = isSubscriber(ev) ? d.cooldownSubImg : d.cooldownImg, secBb = isSubscriber(ev) ? d.cooldownSubBb : d.cooldownBb;
+    var coolImg = coolable && cool.cooling('img', ev, secImg);
+    var coolBb = coolable && cool.cooling('bb', ev, secBb);
+    if (coolBb) { deniedTags = deniedTags.concat(tags); tags = []; }
+    if (coolImg) Object.keys(cmds).forEach(function (t) { cmds[t] = { denied: true }; });
     var nodes = BB.parse(String(ev.content || ''), {
       allowedTags: tags, deniedTags: deniedTags, hideOverflow: d.overflowMode !== 'show', aliases: d.aliases, limits: d.limits, commands: cmds, emojis: ev.emojis || {}
     });
+    // 이번에 실제로 꾸밈이나 채팅콘이 적용되었으면 그 시각부터 쿨타임을 셉니다. (쿨타임 중에 시도한 것은 다시 세지 않음)
+    if (coolable && !coolBb && secBb > 0 && hasNode(nodes, 'tag')) cool.mark('bb', ev);
+    if (coolable && !coolImg && secImg > 0 && hasNode(nodes, 'image')) cool.mark('img', ev);
     // 권한 때문에 글자를 지웠더니 보여 줄 내용이 남지 않으면 줄 전체를 숨깁니다.
     if (nodes.stripped > 0 && BB.isBlank(nodes)) return null;
     var msg = doc.createElement('span');
@@ -433,6 +481,7 @@
     r.setProperty('--text', o.textColor);
     r.setProperty('--outline', o.outlineColor);
     r.setProperty('--bg', o.backgroundColor);
+    r.setProperty('--line-gap', o.lineGap + 'px');
     r.setProperty('--fade-h', o.fadeTopPx + 'px');
     r.setProperty('--fade-min', String(o.fadeTopOpacity / 100));
     doc.body.classList.toggle('no-fade', !(o.fadeTopPx > 0) || o.fadeTopOpacity >= 100);
@@ -464,6 +513,7 @@
     defaultConfig: defaultConfig,
     normalizeConfig: normalizeConfig,
     normalizeOrder: normalizeOrder,
+    publicConfig: publicConfig,
     orderRank: orderRank,
     parseChannelId: parseChannelId,
     looksLikeChatLink: looksLikeChatLink,
@@ -474,6 +524,7 @@
     derive: derive,
     isHidden: isHidden,
     renderLine: renderLine,
+    createCooldown: createCooldown,
     applyStyle: applyStyle
   };
 });

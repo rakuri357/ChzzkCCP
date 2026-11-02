@@ -52,9 +52,11 @@
     else line._t1 = setTimeout(function () { leave(line); }, remain);
   }
 
+  var cooldown = Lite.createCooldown();   // 시청자별 쿨타임 기록 (이 페이지가 열려 있는 동안만)
+
   function addChat(ev) {
     if (Lite.isHidden(ev.content, derived)) return;
-    var line = Lite.renderLine(ev, derived, document);
+    var line = Lite.renderLine(ev, derived, document, demo ? null : cooldown);   // 설정 창 미리보기(demo)에는 쿨타임을 적용하지 않습니다.
     if (!line) return; // 권한 때문에 보여 줄 내용이 없는 채팅
     line._born = Date.now();
     chatEl.appendChild(line);
@@ -116,7 +118,7 @@
     window.addEventListener('message', function (e) {
       if (e.data && e.data.type === 'cc-config') applyConfig(e.data.config);
     });
-    fetch('/api/state').then(function (r) { return r.json(); }).then(function (s) { applyConfig(s.config); }).catch(function () { renderDemo(); });
+    fetch('/api/state?overlay=1').then(function (r) { return r.json(); }).then(function (s) { applyConfig(s.config); }).catch(function () { renderDemo(); });
   } else {
     connect();
   }

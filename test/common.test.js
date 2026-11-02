@@ -225,13 +225,13 @@ test('권한 판단: 모두 / 구독자만 / 운영진만', () => {
 
 test('권한 설정 정리: 알려진 값만 저장하고, 기본은 모두 허용', () => {
   const d = L.normalizeConfig(null);
-  assert.deepEqual(d.permissions, { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide' });
+  assert.deepEqual(d.permissions, { imageAccess: 'all', tagAccess: 'all', deniedMode: 'hide', cooldownImg: 0, cooldownBb: 30, cooldownSubImg: 0, cooldownSubBb: 30 });
   assert.equal(L.normalizeConfig({ permissions: { deniedMode: 'show' } }).permissions.deniedMode, 'show');
   assert.equal(L.normalizeConfig({ permissions: { deniedMode: 'zzz' } }).permissions.deniedMode, 'hide');
   const c = L.normalizeConfig({ permissions: { imageAccess: 'subscribers', tagAccess: 'hack' },
     commands: [{ triggers: ['~a'], image: 'a.png', access: 'staff' }, { triggers: ['~b'], image: 'b.png', access: 'zzz' }, { triggers: ['~c'], image: 'c.png' }],
     bbcode: { tags: { rainbow: { access: 'subscribers' }, b: { access: 'nope' } } } });
-  assert.deepEqual(c.permissions, { imageAccess: 'subscribers', tagAccess: 'all', deniedMode: 'hide' });
+  assert.deepEqual(c.permissions, { imageAccess: 'subscribers', tagAccess: 'all', deniedMode: 'hide', cooldownImg: 0, cooldownBb: 30, cooldownSubImg: 0, cooldownSubBb: 30 });
   assert.deepEqual(c.commands.map((x) => x.access), ['staff', '', '']);
   assert.deepEqual(c.bbcode.tags, { rainbow: { access: 'subscribers' } });
 });
@@ -371,4 +371,125 @@ test('위쪽 흐림 적용: 화면 변수가 정해지고, 높이 0이거나 선
   assert.ok(/#chat \{[^}]*mask-image: linear-gradient\(to bottom, rgba\(0, 0, 0, var\(--fade-min/.test(css), '채팅 영역에 위쪽 그라데이션 마스크');
   assert.ok(/body\.no-fade #chat \{[^}]*mask-image: none/.test(css), '끄는 규칙');
   assert.ok(!/#status[^{]*\{[^}]*mask/.test(css), '연결 안내 상자는 흐리게 하지 않는다');
+});
+
+test('채팅 사이 간격: 기본 8px, 0~60px로 맞추고, 화면 변수와 CSS에 반영된다', () => {
+  assert.equal(L.normalizeConfig(null).overlay.lineGap, 8);
+  assert.equal(L.normalizeConfig({ overlay: { lineGap: 0 } }).overlay.lineGap, 0, '0은 그대로(붙임)');
+  assert.equal(L.normalizeConfig({ overlay: { lineGap: 999 } }).overlay.lineGap, 60);
+  assert.equal(L.normalizeConfig({ overlay: { lineGap: -3 } }).overlay.lineGap, 0);
+  assert.equal(L.normalizeConfig({ overlay: { lineGap: 'x' } }).overlay.lineGap, 8, '이상한 값은 기본값');
+  const doc = new JSDOM('<body></body>').window.document;
+  L.applyStyle(L.normalizeConfig({ overlay: { lineGap: 12 } }).overlay, doc);
+  assert.equal(doc.documentElement.style.getPropertyValue('--line-gap'), '12px');
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'lib', 'overlay.css'), 'utf8');
+  assert.ok(/#chat \{[^}]*gap: var\(--line-gap, 8px\)/.test(css), '간격은 변수로 정한다');
+});
+
+test('제목 줄: "ChzzkChatConPlus"와 작은 버전 표시가 있고 "설정" 글자는 없다 (창 제목은 그대로)', () => {
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'input.html'), 'utf8');
+  assert.ok(/<h1>ChzzkChatConPlus <small id="appver" class="appver"><\/small><\/h1>/.test(html));
+  assert.ok(/<title>ChzzkChatConPlus 설정<\/title>/.test(html), '창 제목은 예전 그대로');
+  const js = require('fs').readFileSync(require('path').join(__dirname, '..', 'public', 'lib', 'input.js'), 'utf8');
+  assert.ok(/\$\('appver'\)\.textContent = 'v' \+ st\.version/.test(js), '앱이 알려 준 버전을 "v버전"으로 보여 줌');
+  assert.ok(!/document\.title\s*=/.test(js), '창 제목은 바꾸지 않음');
+});
+
+// ---------- 쿨타임 ----------
+function clockCool() {
+  const c = { t: 1000000 };
+  const cool = L.createCooldown({ now: () => c.t });
+  return { c, cool };
+}
+const coolLine = (text, cfg, ev, cool) => L.renderLine(Object.assign({ nickname: 'x', role: 'common_user', userId: 'u', content: text, emojis: {} }, ev), L.derive(L.normalizeConfig(cfg)), new JSDOM('<body></body>').window.document, cool);
+const msgOf = (line) => line.querySelector('.msg').textContent;
+
+test('쿨타임 설정: 일반 시청자와 구독자 모두 기본은 채팅콘 0초(끔), BBCode 30초이고 0~600초로 맞춘다', () => {
+  const p = L.normalizeConfig(null).permissions;
+  assert.equal(p.cooldownBb, 30); assert.equal(p.cooldownImg, 0); assert.equal(p.cooldownSubBb, 30); assert.equal(p.cooldownSubImg, 0);
+  const q = L.normalizeConfig({ permissions: { cooldownBb: 99999, cooldownImg: -4, cooldownSubBb: 5, cooldownSubImg: 7 } }).permissions;
+  assert.equal(q.cooldownBb, 600); assert.equal(q.cooldownImg, 0); assert.equal(q.cooldownSubBb, 5); assert.equal(q.cooldownSubImg, 7);
+  assert.equal(L.normalizeConfig({ permissions: { cooldownBb: 0 } }).permissions.cooldownBb, 0, '0은 그대로(끔)');
+  assert.equal(L.normalizeConfig({ permissions: { cooldownBb: 'x' } }).permissions.cooldownBb, 30, '이상한 값은 기본값');
+});
+
+test('쿨타임(BBCode): 한 번 쓰면 30초 동안은 태그만 지우고 글은 평범하게 보여 주고, 지나면 다시 적용된다', () => {
+  const { c, cool } = clockCool();
+  const first = coolLine('[b]하나[/b]', {}, {}, cool);
+  assert.ok(first.querySelector('.bb-b'), '처음은 적용');
+  c.t += 10000;
+  const second = coolLine('[b]둘[/b] [rb]셋[/rb]', {}, {}, cool);
+  assert.equal(second.querySelector('.bb'), null, '쿨타임 중에는 꾸밈 없음');
+  assert.equal(msgOf(second), '둘 셋', '글은 남고 태그 글자만 사라짐');
+  c.t += 25000;   // 처음 쓴 뒤 35초
+  assert.ok(coolLine('[b]넷[/b]', {}, {}, cool).querySelector('.bb-b'), '쿨타임이 지나면 다시 적용');
+});
+
+test('쿨타임: 쿨타임 중에 시도한 것은 시간을 다시 세지 않고, 시청자마다 따로 센다', () => {
+  const { c, cool } = clockCool();
+  coolLine('[b]a[/b]', {}, { userId: 'A' }, cool);
+  c.t += 20000;
+  coolLine('[b]b[/b]', {}, { userId: 'A' }, cool);   // 쿨타임 중 시도
+  c.t += 11000;                                      // 처음 쓴 지 31초
+  assert.ok(coolLine('[b]c[/b]', {}, { userId: 'A' }, cool).querySelector('.bb-b'), '시도해도 시간이 늘어나지 않아 31초 뒤에는 적용');
+  coolLine('[b]d[/b]', {}, { userId: 'B' }, cool);
+  c.t += 1000;
+  assert.ok(coolLine('[b]e[/b]', {}, { userId: 'C' }, cool).querySelector('.bb-b'), '다른 시청자는 영향 없음');
+});
+
+test('쿨타임: 꾸밈을 쓰지 않은 채팅이나 글자 그대로 나온 태그는 쿨타임을 시작하지 않는다', () => {
+  const { c, cool } = clockCool();
+  coolLine('그냥 채팅', {}, {}, cool);
+  coolLine('[color=bad]잘못된 태그[/color]', {}, {}, cool);
+  c.t += 1000;
+  assert.ok(coolLine('[b]이제 처음[/b]', {}, {}, cool).querySelector('.bb-b'));
+});
+
+test('쿨타임: 스트리머와 운영진은 제외, 구독자는 따로 정한 시간을 쓰고, 0초면 끈다', () => {
+  const { c, cool } = clockCool();
+  for (const role of ['streamer', 'streaming_chat_manager']) {
+    coolLine('[b]a[/b]', {}, { role, userId: role }, cool);
+    assert.ok(coolLine('[b]b[/b]', {}, { role, userId: role }, cool).querySelector('.bb-b'), role + '은 쿨타임 없음');
+  }
+  const sub = { userId: 'S', subscriber: { months: 1, tier: 1 } };
+  coolLine('[b]a[/b]', {}, sub, cool);
+  assert.equal(coolLine('[b]b[/b]', {}, sub, cool).querySelector('.bb'), null, '구독자도 기본은 쿨타임 대상');
+  const free = { permissions: { cooldownSubBb: 0 } };
+  const { cool: cool2 } = clockCool();
+  coolLine('[b]a[/b]', free, sub, cool2);
+  assert.ok(coolLine('[b]b[/b]', free, sub, cool2).querySelector('.bb-b'), '구독자 BBCode 쿨타임을 0으로 하면 쿨타임 없음');
+  coolLine('[b]a[/b]', free, { userId: 'V' }, cool2);
+  assert.equal(coolLine('[b]b[/b]', free, { userId: 'V' }, cool2).querySelector('.bb'), null, '일반 시청자는 여전히 쿨타임');
+  const off = { permissions: { cooldownBb: 0 } };
+  const { cool: cool3 } = clockCool();
+  coolLine('[b]a[/b]', off, {}, cool3);
+  assert.ok(coolLine('[b]b[/b]', off, {}, cool3).querySelector('.bb-b'), '0초면 끔');
+  assert.ok(coolLine('[b]x[/b]', {}, { userId: 'Z' }, null).querySelector('.bb-b'), '쿨타임 기록이 없으면(미리보기) 적용하지 않음');
+});
+
+test('쿨타임(채팅콘): 별도의 설정이라서 BBCode와 따로 센다. 기본은 꺼져 있다', () => {
+  const cmds = { commands: [{ triggers: ['~감사'], image: 'a.png' }] };
+  const { c, cool } = clockCool();
+  coolLine('~감사', cmds, {}, cool);
+  assert.equal(coolLine('~감사', cmds, {}, cool).querySelectorAll('img.cmd-img').length, 1, '기본(0초)은 쿨타임 없음');
+  const cfg = { ...cmds, permissions: { cooldownImg: 20, cooldownBb: 0 } };
+  const { c: c2, cool: cool2 } = clockCool();
+  assert.equal(coolLine('~감사', cfg, {}, cool2).querySelectorAll('img.cmd-img').length, 1);
+  c2.t += 5000;
+  const l = coolLine('고마워요 ~감사', cfg, {}, cool2);
+  assert.equal(l.querySelectorAll('img.cmd-img').length, 0, '쿨타임 중에는 이미지가 되지 않고');
+  assert.equal(msgOf(l), '고마워요 ', '명령어 글자는 지워지고 글은 남음');
+  assert.equal(coolLine('~감사', cfg, {}, cool2), null, '명령어만 쓴 채팅은 줄 전체를 숨김');
+  c2.t += 20000;
+  assert.equal(coolLine('~감사', cfg, {}, cool2).querySelectorAll('img.cmd-img').length, 1, '지나면 다시 이미지');
+  // BBCode는 채팅콘 쿨타임과 별개
+  assert.ok(coolLine('[b]굵게[/b]', { ...cfg, permissions: { cooldownImg: 20, cooldownBb: 0 } }, {}, cool2).querySelector('.bb-b'));
+});
+
+test('쿨타임: 치지직 이모티콘은 채팅콘이 아니라서 쿨타임에 걸리지 않는다', () => {
+  const cfg = { permissions: { cooldownImg: 30 } };
+  const { cool } = clockCool();
+  const ev = { emojis: { d_1: 'https://ssl.pstatic.net/a.gif' } };
+  coolLine('{:d_1:}', cfg, ev, cool);
+  assert.equal(coolLine('{:d_1:}', cfg, ev, cool).querySelectorAll('img.cc-emoji').length, 1);
 });

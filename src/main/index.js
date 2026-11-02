@@ -20,6 +20,7 @@ let tray = null;
 let running = null;
 let quitting = false;
 let trayNoticeShown = false;
+let latestUpdate = null;   // { latest, url, show, notify }: 새 버전 확인 결과
 
 // 이미지와 설정은 실행 파일 옆의 폴더에 저장합니다. (포터블: 폴더째 옮기면 설정도 같이 갑니다.) 쓸 수 없으면 사용자 데이터 폴더.
 // 예전 이름의 폴더(chzzk-overlay-data)가 있으면 새 이름으로 바꿔서 설정과 이미지를 그대로 이어 씁니다.
@@ -127,17 +128,40 @@ function showWindow() {
   createWindow().catch((e) => dialog.showErrorBox('창을 열지 못했습니다', String((e && e.message) || e)));
 }
 
+// 트레이 메뉴와 설명: 버전을 보여 주고, 새 버전이 있으면 받으러 가는 항목을 맨 위에 둡니다.
+function refreshTray() {
+  if (!tray) return;
+  const u = latestUpdate && latestUpdate.show ? latestUpdate : null;
+  tray.setToolTip(APP.NAME + ' (실행 중)' + (u ? ' · 새 버전 ' + u.latest : ''));
+  const items = [];
+  if (u) items.push({ label: '새 버전 ' + u.latest + ' 받으러 가기', click: () => shell.openExternal(u.url) }, { type: 'separator' });
+  items.push(
+    { label: '설정 열기', click: showWindow },
+    { label: 'OBS 브라우저 소스 주소 복사', click: () => clipboard.writeText(running.url + '/output.html') },
+    { type: 'separator' },
+    { label: '종료', click: quitApp }
+  );
+  tray.setContextMenu(Menu.buildFromTemplate(items));
+}
+
+// 새 버전 확인 결과가 오면 트레이를 갱신하고, 창이 숨겨져 있을 때만 같은 버전에 한 번 말풍선으로 알립니다.
+function handleUpdate(u) {
+  latestUpdate = u;
+  refreshTray();
+  if (!u.notify || !tray || !running) return;
+  if (win && win.isVisible()) return;   // 설정 창이 보이면 위쪽 안내 줄로 충분합니다.
+  try {
+    tray.displayBalloon({ title: APP.NAME, content: '새 버전 ' + u.latest + '이(가) 있습니다. 클릭하면 내려받는 곳을 엽니다.' });
+    running.markUpdateNotified(u.latest);
+  } catch { /* 말풍선을 못 띄워도 동작에는 영향이 없음 */ }
+}
+
 function createTray() {
   try {
     tray = new Tray(nativeImage.createFromPath(path.join(ASSETS, 'tray.png')));
-    tray.setToolTip(APP.NAME + ' (실행 중)');
-    tray.setContextMenu(Menu.buildFromTemplate([
-      { label: '설정 열기', click: showWindow },
-      { label: 'OBS 브라우저 소스 주소 복사', click: () => clipboard.writeText(running.url + '/output.html') },
-      { type: 'separator' },
-      { label: '종료', click: quitApp }
-    ]));
+    refreshTray();
     tray.on('click', showWindow);
+    tray.on('balloon-click', () => { if (latestUpdate && latestUpdate.show) shell.openExternal(latestUpdate.url); });
   } catch (e) {
     console.warn('[tray] 트레이 아이콘을 만들지 못했습니다:', e.message); // 트레이가 없어도 앱은 동작합니다.
   }
@@ -166,7 +190,8 @@ if (!gotLock) {
         bridgeDir: bridge,
         appVersion: app.getVersion(),
         openFolder: (dir) => shell.openPath(dir),
-        onQuit: quitApp
+        onQuit: quitApp,
+        onUpdate: handleUpdate
       });
       writeLauncher(bridge);
       setupPermissions();

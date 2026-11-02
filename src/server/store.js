@@ -1,5 +1,6 @@
 'use strict';
-// 설정(config.json)과 이미지(images/)를 데이터 폴더에 저장합니다.
+// 설정(config.json), 채널 정보(channel.json), 이미지(images/)를 데이터 폴더에 저장합니다.
+// 채널 주소와 채팅창 열쇠는 config.json과 따로 channel.json에 둡니다. (설정 파일만 공유하거나 백업할 때 열쇠가 같이 나가지 않게)
 const fs = require('fs');
 const path = require('path');
 const Lite = require('../../public/lib/common');
@@ -9,27 +10,61 @@ class Store {
     this.dataDir = dataDir;
     this.imagesDir = path.join(dataDir, 'images');
     this.configPath = path.join(dataDir, 'config.json');
+    this.channelPath = path.join(dataDir, 'channel.json');
+    this._lastChannel = null;
     this.config = Lite.normalizeConfig(null);
   }
 
   init() {
     fs.mkdirSync(this.imagesDir, { recursive: true });
     // 처음 실행: 이미지도 명령어도 없는 빈 상태로 시작합니다.
-    if (!fs.existsSync(this.configPath)) this._write(Lite.normalizeConfig(Lite.defaultConfig()));
+    // 설정 파일이 없을 때 기본 설정을 만드는 것은 채널 정보를 건드리지 않습니다. (config.json만 지워도 채널은 남아야 함)
+    if (!fs.existsSync(this.configPath)) this._write(Lite.normalizeConfig(Lite.defaultConfig()), true);
+    this._migrateChannel();
     this.load();
     return this;
   }
 
+  _writeJson(file, obj) {
+    const tmp = file + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2) + '\n', 'utf8');
+    fs.renameSync(tmp, file);
+  }
+
+  /** 예전 버전은 채널 정보를 config.json 안에 저장했습니다. 새 파일을 먼저 쓰고 확인한 뒤에 옛 파일에서 지웁니다. */
+  _migrateChannel() {
+    let raw;
+    try { raw = JSON.parse(fs.readFileSync(this.configPath, 'utf8')); } catch { return; }
+    if (!raw || typeof raw !== 'object' || !('channel' in raw)) return;
+    const old = Lite.normalizeConfig({ channel: raw.channel }).channel;
+    if ((old.url || old.channelId || old.chatKey) && !fs.existsSync(this.channelPath)) this._writeJson(this.channelPath, old);
+    delete raw.channel;
+    this._writeJson(this.configPath, raw);
+  }
+
   load() {
-    try { this.config = Lite.normalizeConfig(JSON.parse(fs.readFileSync(this.configPath, 'utf8'))); }
-    catch (e) { console.warn('[store] config.json을 읽지 못해 이전 값을 유지합니다:', e.message); }
+    let raw = null;
+    try { raw = JSON.parse(fs.readFileSync(this.configPath, 'utf8')); }
+    catch (e) { console.warn('[store] config.json을 읽지 못해 이전 값을 유지합니다:', e.message); return this.config; }
+    let channel = null;
+    if (fs.existsSync(this.channelPath)) {
+      try { channel = JSON.parse(fs.readFileSync(this.channelPath, 'utf8')); }
+      catch (e) { console.warn('[store] channel.json을 읽지 못해 채널 정보를 비워 둡니다:', e.message); }
+    }
+    this.config = Lite.normalizeConfig(Object.assign({}, raw, { channel: channel || {} }));
+    this._lastChannel = JSON.stringify(this.config.channel);
     return this.config;
   }
 
-  _write(cfg) {
-    const tmp = this.configPath + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + '\n', 'utf8');
-    fs.renameSync(tmp, this.configPath);
+  _write(cfg, skipChannel) {
+    // 채널 정보는 channel.json에 먼저 쓰고(바뀐 경우만), config.json에는 채널 정보를 빼고 씁니다.
+    const { channel, ...rest } = cfg;
+    if (skipChannel) { this._writeJson(this.configPath, rest); return; }
+    const chText = JSON.stringify(channel);
+    const empty = !(channel.url || channel.channelId || channel.chatKey);
+    if (chText !== this._lastChannel && !(empty && !fs.existsSync(this.channelPath))) this._writeJson(this.channelPath, channel);
+    this._lastChannel = chText;
+    this._writeJson(this.configPath, rest);
   }
 
   save(input) {

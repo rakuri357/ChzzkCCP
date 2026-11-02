@@ -76,29 +76,36 @@ async function startServer(options = {}) {
   hub.on('status', (s) => broadcast({ type: 'status', status: s }));
 
   // ---------- 새 버전 확인 ----------
-  // 설정에서 켜 둔 동안 시작할 때와 6시간마다 GitHub의 최신 릴리스를 조회합니다. 실패해도 조용히 넘어갑니다.
+  // 설정에서 켜 둔 경우 앱을 켠 뒤 한 번만 GitHub의 최신 릴리스를 조회합니다. (방송 중에 갑자기 알리지 않기 위해 반복하지 않습니다.) 실패해도 조용히 넘어갑니다.
   const appVersion = options.appVersion || require('../../package.json').version;
   let updateInfo = null;
-  let updateTimer = null, updateFirst = null;
+  let updateFirst = null;
+  // 확인 결과와 지금 설정을 합쳐서 main(트레이)에 알립니다.
+  function emitUpdate(allowNotify) {
+    if (!updateInfo || typeof options.onUpdate !== 'function') return;
+    const f = updateCheck.flags(store.config.ui, updateInfo);
+    try { options.onUpdate(Object.assign({}, updateInfo, { show: f.show, notify: allowNotify && f.notify })); } catch { /* 트레이 쪽 문제는 무시 */ }
+  }
   async function runUpdateCheck() {
     if (store.config.ui.updateCheck === false) return;
     try {
       updateInfo = Object.assign(await updateCheck.checkLatest({ apiUrl: options.updateApiUrl, current: appVersion, timeoutMs: options.updateTimeoutMs }), { checkedAt: Date.now() });
       broadcast({ type: 'update', update: updateInfo });
+      emitUpdate(true);
     } catch { /* 확인하지 못해도 앱 사용에는 영향이 없습니다. */ }
   }
 
   // 탐색기에서 이미지를 다른 폴더로 옮긴 경우 명령어가 가리키는 경로를 자동으로 고치고, 오버레이에도 알립니다.
   function relink() {
-    if (store.relinkCommands()) broadcast({ type: 'config', config: store.config });
+    if (store.relinkCommands()) broadcast({ type: 'config', config: Lite.publicConfig(store.config) });
   }
 
-  function state(req) {
+  function state(req, forOverlay) {
     const host = req.headers.host;
     relink();
     return {
       app: APP.ID,
-      config: store.config,
+      config: forOverlay ? Lite.publicConfig(store.config) : store.config,   // 오버레이에는 채널 정보를 보내지 않습니다.
       images: store.listImages(),
       folders: store.listFolders(),
       status: hub.status,
@@ -113,7 +120,7 @@ async function startServer(options = {}) {
 
   async function api(req, res, url) {
     const p = url.pathname;
-    if (p === '/api/state' && req.method === 'GET') return sendJson(res, 200, state(req));
+    if (p === '/api/state' && req.method === 'GET') return sendJson(res, 200, state(req, url.searchParams.get('overlay') === '1'));
 
     if (p === '/api/config' && req.method === 'PUT') {
       let body;
@@ -122,7 +129,8 @@ async function startServer(options = {}) {
       const cfg = store.save(body);
       hub.apply(cfg);
       if (!wasUpdateOn && cfg.ui.updateCheck !== false) runUpdateCheck();   // 알림을 다시 켜면 바로 확인
-      broadcast({ type: 'config', config: cfg });
+      else emitUpdate(false);   // 알림을 끄거나 "다시 알리지 않기"를 누르면 트레이 메뉴도 바로 갱신
+      broadcast({ type: 'config', config: Lite.publicConfig(cfg) });
       return sendJson(res, 200, cfg);
     }
 
@@ -252,7 +260,7 @@ async function startServer(options = {}) {
       clients.add(ws);
       ws.on('close', () => clients.delete(ws));
       ws.on('error', () => clients.delete(ws));
-      ws.send(JSON.stringify({ type: 'config', config: store.config }));
+      ws.send(JSON.stringify({ type: 'config', config: Lite.publicConfig(store.config) }));
       ws.send(JSON.stringify({ type: 'status', status: hub.status }));
       ws.send(JSON.stringify({ type: 'recent', list: hub.recent.slice(-10) }));
     });
@@ -303,15 +311,16 @@ async function startServer(options = {}) {
   runtimeTimer.unref();
 
   updateFirst = setTimeout(runUpdateCheck, options.updateFirstDelayMs == null ? 5000 : options.updateFirstDelayMs);
-  updateTimer = setInterval(runUpdateCheck, options.updateIntervalMs || 6 * 60 * 60 * 1000);
-  updateFirst.unref(); updateTimer.unref();
+  updateFirst.unref();
 
   return {
     server, store, hub, port: actualPort,
+    // 같은 버전을 트레이 말풍선으로 두 번 알리지 않도록 알린 버전을 설정에 남깁니다.
+    markUpdateNotified: (version) => { const c = store.config; store.save(Object.assign({}, c, { ui: Object.assign({}, c.ui, { updateNotified: String(version) }) })); },
     url: `http://localhost:${actualPort}`,
     close: async () => {
       clearInterval(runtimeTimer);
-      clearTimeout(updateFirst); clearInterval(updateTimer);
+      clearTimeout(updateFirst);
       try { fs.unlinkSync(runtimeFile); } catch { /* 이미 없음 */ }
       removeMirror();
       hub.stop();

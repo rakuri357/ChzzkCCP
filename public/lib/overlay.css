@@ -13,7 +13,7 @@ body.preview {
 #chat {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; justify-content: flex-end;
-  padding: 8px 12px; gap: 4px; overflow: hidden;
+  padding: 8px 12px; gap: var(--line-gap, 8px); overflow: hidden;
   background: var(--bg);
   /* 맨 위 가장자리는 약간 투명하게 시작해서 아래로 내려오면서 또렷해집니다. */
   -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--fade-min, 0.5)) 0, #000 var(--fade-h, 24px));

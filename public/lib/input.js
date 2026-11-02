@@ -75,7 +75,7 @@
 
   var saveTimer = null;
   function updatePreview() {
-    try { $('pv').contentWindow.postMessage({ type: 'cc-config', config: L.normalizeConfig(S.cfg) }, '*'); } catch (e) { /* 미리보기 로딩 전 */ }
+    try { $('pv').contentWindow.postMessage({ type: 'cc-config', config: L.publicConfig(L.normalizeConfig(S.cfg)) }, '*'); } catch (e) { /* 미리보기 로딩 전 */ }
   }
   $('pv').addEventListener('load', updatePreview);
 
@@ -183,6 +183,7 @@
     Object.keys(S.sections).forEach(function (k) { S.sections[k].sum.textContent = summaryFor(k); });
     if (S.updateResetBtn) S.updateResetBtn();
     if (S.refreshPerms) S.refreshPerms();
+    if (S.permSums) Object.keys(S.permSums).forEach(function (k) { S.permSums[k](); });   // 접힌 목록의 "기본 권한과 다름" 개수
   }
 
   // ---------- 칩 입력 (채팅콘, 태그 이름 공용) ----------
@@ -525,6 +526,17 @@
   }
   function dirOf(p) { var i = p.lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i); }
 
+  // 채팅콘 정렬 규칙: 3번 패널의 목록과 6번 패널의 채팅콘별 권한 목록이 같이 씁니다.
+  function imageComparator(sort, cnt) {
+    var collator = new Intl.Collator('ko');
+    function byName(a, b) { return collator.compare(a.name, b.name) || collator.compare(a.path, b.path); }
+    return function (a, b) {
+      if (sort === 'tag') return collator.compare(a.tag, b.tag) || (L.orderRank(S.cfg.order, a.tag, a.path) - L.orderRank(S.cfg.order, b.tag, b.path)) || byName(a, b);
+      if (sort === 'recent') return (b.mtime - a.mtime) || byName(a, b);
+      if (sort === 'nocmd' && cnt) return ((cnt(a) ? 1 : 0) - (cnt(b) ? 1 : 0)) || byName(a, b);
+      return byName(a, b);
+    };
+  }
   function visibleImageRows() {
     var present = {}, rows = [];
     S.images.forEach(function (i) { present[i.path] = true; rows.push({ path: i.path, name: i.name, tag: i.tag, size: i.size, mtime: i.mtime, url: imageUrl(i), missing: false }); });
@@ -543,15 +555,8 @@
       if (!q) return true;
       return r.path.toLowerCase().indexOf(q) >= 0 || (e && e.triggers.some(function (t) { return t.toLowerCase().indexOf(q) >= 0; }));
     });
-    var collator = new Intl.Collator('ko');
-    function byName(a, b) { return collator.compare(a.name, b.name) || collator.compare(a.path, b.path); }
     function cnt(r) { var e = cmdOf(r.path); return e ? e.triggers.length : 0; }
-    filtered.sort(function (a, b) {
-      if (f.sort === 'tag') return collator.compare(a.tag, b.tag) || (L.orderRank(S.cfg.order, a.tag, a.path) - L.orderRank(S.cfg.order, b.tag, b.path)) || byName(a, b);
-      if (f.sort === 'recent') return (b.mtime - a.mtime) || byName(a, b);
-      if (f.sort === 'nocmd') return ((cnt(a) ? 1 : 0) - (cnt(b) ? 1 : 0)) || byName(a, b);
-      return byName(a, b);
-    });
+    filtered.sort(imageComparator(f.sort, cnt));
     return { all: rows.length, shown: filtered };
   }
 
@@ -835,13 +840,6 @@
     });
     c.appendChild(list);
     S.fillBBSamples();
-    var L2 = bb.limits;
-    function lim(label, key, min, max) { return field(label, num(L2[key], min, max, function (n) { L2[key] = n; changed(); }), 'small'); }
-    c.appendChild(h('details', null, h('summary', { text: '남용 방지 한도 (보통은 그대로 두십시오)' }),
-      h('p', { class: 'msg muted', text: '태그 겹침, 태그 개수, 움직이는 효과, 채팅콘 개수의 한도를 넘은 부분을 어떻게 보여 줄지 정합니다. 형식이 틀린 태그(예: [color=bad])는 항상 쓴 글자 그대로 나옵니다.' }),
-      overflowModeField(),
-      h('div', { class: 'row' }, lim('최대 글자 수', 'maxLength', 20, 1000), lim('태그 겹치는 깊이', 'maxDepth', 1, 10), lim('태그 개수', 'maxTags', 1, 50)),
-      h('div', { class: 'row' }, lim('움직이는 효과 수', 'maxEffects', 0, 20), lim('글자 크기 하한(%)', 'minSize', 30, 100), lim('글자 크기 상한(%)', 'maxSize', 100, 400), lim('이미지 수', 'maxImages', 0, 30))));
   }
 
   // ---------- 화면: 6. 권한 ----------
@@ -868,6 +866,17 @@
     return { viewer: h('label', { class: 'permcell', title: '일반 시청자' }, viewerCb), sub: h('label', { class: 'permcell', title: '구독자' }, subCb), repaint: paint };
   }
 
+  // 남용 방지 한도 (6번 패널): 한도를 넘은 부분을 어떻게 보여 줄지도 여기서 정합니다.
+  function limitsBox() {
+    var L2 = S.cfg.bbcode.limits;
+    function lim(label, key, min, max) { return field(label, num(L2[key], min, max, function (n) { L2[key] = n; changed(); }), 'small'); }
+    return h('div', { class: 'permbox' }, h('div', { class: 'permtitle', text: '남용 방지 한도' }),
+      h('p', { class: 'msg muted', style: 'margin:4px 0 8px', text: '보통은 그대로 두십시오. 태그 겹침, 태그 개수, 움직이는 효과, 채팅콘 개수의 한도를 넘은 부분을 어떻게 보여 줄지 정합니다. 형식이 틀린 태그(예: [color=bad])는 항상 쓴 글자 그대로 나옵니다.' }),
+      overflowModeField(),
+      h('div', { class: 'row' }, lim('최대 글자 수', 'maxLength', 20, 1000), lim('태그 겹치는 깊이', 'maxDepth', 1, 10), lim('태그 개수', 'maxTags', 1, 50)),
+      h('div', { class: 'row' }, lim('움직이는 효과 수', 'maxEffects', 0, 20), lim('글자 크기 하한(%)', 'minSize', 30, 100), lim('글자 크기 상한(%)', 'maxSize', 100, 400), lim('이미지 수', 'maxImages', 0, 30)));
+  }
+
   // 남용 방지 한도를 넘은 부분의 처리
   function overflowModeField() {
     var sel = h('select', { 'aria-label': '한도를 넘은 부분', onchange: function (e) { S.cfg.bbcode.overflowMode = e.target.value; changed(); } },
@@ -875,6 +884,20 @@
     sel.value = S.cfg.bbcode.overflowMode === 'show' ? 'show' : 'hide';
     sel.style.minWidth = '210px';
     return h('div', { class: 'row' }, field('한도를 넘은 부분', sel));
+  }
+
+  // 쿨타임 (6번 패널): 같은 시청자가 BBCode나 채팅콘을 연달아 쓰는 도배를 막습니다.
+  function cooldownBox() {
+    var perm = S.cfg.permissions;
+    return h('div', { class: 'permbox' },
+      h('div', { class: 'permtitle', text: '쿨타임' }),
+      h('p', { class: 'msg muted', style: 'margin:4px 0 8px', text: '같은 시청자가 채팅콘이나 BBCode를 쓴 뒤 이 시간이 지나기 전에 또 쓰면, 명령어나 꾸밈 글자만 지우고 글은 평범하게 보여 줍니다. 0이면 끕니다. 스트리머와 운영진은 항상 제외됩니다.' }),
+      h('div', { class: 'row' },
+        field('일반 채팅콘(초)', num(perm.cooldownImg, 0, 600, function (n) { perm.cooldownImg = n; changed(); }), 'small'),
+        field('일반 BBCode(초)', num(perm.cooldownBb, 0, 600, function (n) { perm.cooldownBb = n; changed(); }), 'small')),
+      h('div', { class: 'row' },
+        field('구독자 채팅콘(초)', num(perm.cooldownSubImg, 0, 600, function (n) { perm.cooldownSubImg = n; changed(); }), 'small'),
+        field('구독자 BBCode(초)', num(perm.cooldownSubBb, 0, 600, function (n) { perm.cooldownSubBb = n; changed(); }), 'small')));
   }
 
   // 구독자 전용 기능을 권한 없이 썼을 때의 처리
@@ -888,7 +911,7 @@
   }
 
   function renderPermissions() {
-    var c = begin('s-permissions', 'permissions', '6. 권한');
+    var c = begin('s-permissions', 'permissions', '6. 권한 및 남용 방지');
     var perm = S.cfg.permissions;
     c.appendChild(h('p', { class: 'lead', text: '일반 시청자와 구독자가 쓸 수 있는 채팅콘과 BBCode를 정합니다. 스트리머와 운영진은 항상 모두 쓸 수 있습니다. 운영진 전용으로 정했거나 꺼 둔 기능을 쓰면 쓴 글자 그대로 나옵니다.' }));
 
@@ -907,9 +930,12 @@
       h('p', { class: 'msg muted', style: 'margin:6px 0 0', text: '따로 정하지 않은 기능과 새로 추가하는 항목은 이 기본 권한을 따릅니다.' }),
       deniedModeField()));
 
+    c.appendChild(cooldownBox());
+    c.appendChild(limitsBox());
     c.appendChild(h('div', { id: 'permlists' }));
     c.appendChild(h('p', { class: 'msg muted', text: '구독자 여부는 치지직 채팅 정보로 판단합니다. 2번 패널의 최근 채팅에 [구독 N개월]이 보이는지 확인하십시오. 읽지 못하면 구독자 전용 기능은 운영진만 쓸 수 있습니다.' }));
     S.permFilter = S.permFilter || { img: false, tag: false };
+    S.permOpen = S.permOpen || { img: false, tag: false };   // 목록을 펼쳤는지: 저장하지 않으므로 앱을 켤 때마다 접힌 상태로 시작합니다.
     renderPermLists();
     S.refreshPerms = refreshPermsIfChanged;
   }
@@ -921,14 +947,16 @@
     var tags = S.cfg.bbcode.tags;
     return JSON.stringify([
       S.cfg.commands.map(function (cm) { return [cm.image, cm.triggers.join(',')]; }),
+      S.cfg.ui.imageSort, S.cfg.order,   // 3번 패널의 정렬과 순서가 바뀌면 6번 채팅콘 목록도 다시 그림
       S.images.map(function (i) { return i.path; }),
       Object.keys(tags).map(function (k) { return [k, tags[k].enabled, tags[k].names]; })
     ]);
   }
   function refreshPermsIfChanged() { if ($('permlists') && permSignature() !== permSig) renderPermLists(); }
 
-  function permList(title, rowsFn, key) {
-    var box = h('div', { class: 'permbox' });
+  function permList(title, rowsFn, key, countFn) {
+    var open = !!S.permOpen[key];
+    var box = h('div', { class: 'permbox permfold' });
     var list = h('div', { class: 'permlist' });
     var only = check('기본 권한과 다른 항목만 보기', S.permFilter[key], function (on) { S.permFilter[key] = on; renderPermLists(); });
     var reset = h('button', { type: 'button', class: 'small', text: '모두 기본 권한으로', onclick: function () {
@@ -936,7 +964,15 @@
       else Object.keys(S.cfg.bbcode.tags).forEach(function (k) { if (S.cfg.bbcode.tags[k]) { delete S.cfg.bbcode.tags[k].access; if (!Object.keys(S.cfg.bbcode.tags[k]).length) delete S.cfg.bbcode.tags[k]; } });
       renderPermLists(); updateSummaries(); changed();
     } });
-    box.appendChild(h('div', { class: 'permbar' }, h('div', { class: 'permtitle', text: title }), only, reset));
+    // 제목 줄: 누르면 접고 펍니다. 접혀 있어도 기본 권한과 다른 항목이 몇 개인지 보입니다.
+    var sum = h('span', { class: 'sum' });
+    function paintSum() { var n = countFn(); sum.textContent = n.total + '개 중 ' + n.custom + '개가 기본 권한과 다름'; }
+    paintSum();
+    S.permSums = S.permSums || {}; S.permSums[key] = paintSum;
+    box.appendChild(h('button', { type: 'button', class: 'subhead', 'aria-expanded': String(open), onclick: function () { S.permOpen[key] = !S.permOpen[key]; renderPermLists(); } },
+      h('span', { class: 'arrow', 'aria-hidden': 'true', text: open ? '▾' : '▸' }), h('span', { class: 'permtitle', text: title }), sum));
+    if (!open) return box;
+    box.appendChild(h('div', { class: 'permbar' }, only, reset));
     box.appendChild(head2());
     var n = rowsFn(list);
     if (!n) list.appendChild(h('div', { class: 'dropzone', text: key === 'img' ? (S.cfg.commands.length ? '조건에 맞는 이미지가 없습니다.' : '명령어가 있는 이미지가 아직 없습니다. 3번 패널에서 이미지를 추가하십시오.') : '조건에 맞는 태그가 없습니다.' }));
@@ -966,11 +1002,17 @@
     S.images.forEach(function (i) { byPath[i.path] = i; });
 
     host.appendChild(permList('채팅콘별 권한', function (list) {
-      var collator = new Intl.Collator('ko');
-      var cmds = S.cfg.commands.filter(function (cm) { return cm.triggers.length; }).slice().sort(function (a, b) { return collator.compare(baseName(a.image), baseName(b.image)); });
-      var shown = 0;
-      cmds.forEach(function (cm) {
+      // 3번 패널에서 고른 정렬(이름순, 태그별로 묶기, 최근 추가순)을 그대로 따릅니다. 태그별로 묶으면 3번에서 정한 순서도 같습니다.
+      var sort = S.cfg.ui.imageSort || 'name';
+      var rows = S.cfg.commands.filter(function (cm) { return cm.triggers.length; }).map(function (cm) {
+        var it = byPath[cm.image];
+        return { cm: cm, path: cm.image, name: baseName(cm.image), tag: dirOf(cm.image), mtime: it ? it.mtime : 0 };
+      }).sort(imageComparator(sort));
+      var shown = 0, lastTag = null;
+      rows.forEach(function (r) {
+        var cm = r.cm;
         if (S.permFilter.img && !cm.access) return;
+        if (sort === 'tag' && r.tag !== lastTag) { list.appendChild(h('div', { class: 'permtag', text: r.tag || '태그 없음' })); lastTag = r.tag; }
         var it = byPath[cm.image];
         var nameEl = h('div', { class: 'permname permimg' },
           h('img', { class: 'permthumb', alt: '', src: it ? imageUrl(it) : TRANSPARENT_GIF }),
@@ -980,7 +1022,10 @@
         shown++;
       });
       return shown;
-    }, 'img'));
+    }, 'img', function () {
+      var cmds = S.cfg.commands.filter(function (cm) { return cm.triggers.length; });
+      return { total: cmds.length, custom: cmds.filter(function (cm) { return cm.access; }).length };
+    }));
 
     host.appendChild(permList('BBCode 태그별 권한', function (list) {
       var shown = 0;
@@ -999,7 +1044,10 @@
         shown++;
       });
       return shown;
-    }, 'tag'));
+    }, 'tag', function () {
+      var tags = S.cfg.bbcode.tags;
+      return { total: Object.keys(BB.TAG_DEFS).length, custom: Object.keys(tags).filter(function (k) { return tags[k] && tags[k].access; }).length };
+    }));
     permSig = permSignature();
   }
 
@@ -1144,6 +1192,7 @@
     c.appendChild(h('div', { class: 'row' },
       field('글자 크기(px)', num(o.fontSize, 10, 120, function (n) { o.fontSize = n; updateSummaries(); changed(); }), 'small'),
       field('최대 줄 수', num(o.maxLines, 1, 100, function (n) { o.maxLines = n; updateSummaries(); changed(); }), 'small'),
+      field('채팅 사이 간격(px)', num(o.lineGap, 0, 60, function (n) { o.lineGap = n; changed(); }), 'small'),
       field('채팅이 사라지는 시간(초, 0이면 사라지지 않음)', num(o.lineLifetimeSec, 0, 3600, function (n) { o.lineLifetimeSec = n; changed(); }))));
     c.appendChild(h('div', { class: 'row' },
       field('위쪽 흐림 높이(px, 0이면 끔)', num(o.fadeTopPx, 0, 400, function (n) { o.fadeTopPx = n; changed(); }), 'small'),
@@ -1263,6 +1312,7 @@
     S.cfg = L.normalizeConfig(st.config);
     S.images = st.images; S.folders = st.folders || []; S.status = st.status; S.recent = st.recent || [];
     S.dataDir = st.dataDir; S.urls = st.urls; S.canOpenFolder = st.canOpenFolder; S.update = st.update || null;
+    if (st.version) $('appver').textContent = 'v' + st.version;   // 제목 줄에 지금 버전을 작게 보여 줍니다.
     renderAll();
     renderUpdate();
     setChip('ok', '자동 저장');

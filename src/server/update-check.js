@@ -51,4 +51,15 @@ async function checkLatest(opts) {
   } finally { clearTimeout(timer); }
 }
 
-module.exports = { DEFAULT_API, RELEASES_URL, parseVersion, compareVersions, safeReleaseUrl, parseLatest, checkLatest };
+/**
+ * 확인 결과를 지금 설정에 비추어 어떻게 보여 줄지 정합니다.
+ *  show   : 새 버전이 있고, 알림이 켜져 있고, 이 버전을 "다시 알리지 않기"로 하지 않았음 (설정 창 안내 줄과 트레이 메뉴)
+ *  notify : show이면서 이 버전을 아직 말풍선으로 알린 적이 없음 (트레이 말풍선은 같은 버전에 한 번만)
+ */
+function flags(ui, info) {
+  const u = ui || {};
+  const show = !!(info && info.newer && u.updateCheck !== false && u.updateDismissed !== info.latest);
+  return { show, notify: show && u.updateNotified !== info.latest };
+}
+
+module.exports = { flags, DEFAULT_API, RELEASES_URL, parseVersion, compareVersions, safeReleaseUrl, parseLatest, checkLatest };
