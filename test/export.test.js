@@ -145,18 +145,48 @@ test('페이지: 이미지를 누르면 첫 명령어가, 칩을 누르면 그 �
   assert.ok(doc.getElementById('toast').textContent.includes('복사했습니다'));
 });
 
-test('페이지: 터치 화면에서는 이미지를 누르면 명령어 창이 열린다', () => {
+test('페이지: 터치 화면에서는 이미지를 누르면 첫 명령어가 바로 복사되고 상세 창은 없다', async () => {
   const store = makeStore();
+  const copied = [];
   const dom = new JSDOM(renderHtml(collect(store.config, store.listImages())), {
     runScripts: 'dangerously',
-    beforeParse(w) { w.matchMedia = (q) => ({ matches: q.includes('hover: none'), media: q }); }
+    beforeParse(w) {
+      w.matchMedia = (q) => ({ matches: q.includes('hover: none'), media: q });
+      Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: (t) => { copied.push(t); return Promise.resolve(); } } });
+    }
   });
   const doc = dom.window.document;
-  doc.querySelector('.thumb').dispatchEvent(new dom.window.Event('click'));
-  assert.ok(doc.getElementById('sheetbg').classList.contains('open'));
-  assert.ok(doc.querySelectorAll('#sheet .chip').length >= 1);
-  doc.querySelector('#sheet .close').dispatchEvent(new dom.window.Event('click'));
-  assert.ok(!doc.getElementById('sheetbg').classList.contains('open'));
+  assert.equal(doc.getElementById('sheetbg'), null, '폰용 상세 창은 없음');
+  const card = doc.querySelector('.card');
+  const first = card.querySelector('.chip').textContent;
+  card.querySelector('.thumb').dispatchEvent(new dom.window.Event('click'));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(copied, [first]);
+  assert.ok(doc.getElementById('toast').textContent.includes('복사했습니다'));
+});
+
+test('페이지: 스크롤하던 터치는 복사로 치지 않고, 가만히 누르면 복사된다', async () => {
+  const store = makeStore();
+  const copied = [];
+  const dom = new JSDOM(renderHtml(collect(store.config, store.listImages())), {
+    runScripts: 'dangerously',
+    beforeParse(w) {
+      w.matchMedia = (q) => ({ matches: q.includes('hover: none'), media: q });
+      Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: (t) => { copied.push(t); return Promise.resolve(); } } });
+    }
+  });
+  const win = dom.window, doc = win.document;
+  const touch = (type, x, y) => { const e = new win.Event(type, { bubbles: true }); e.touches = [{ clientX: x, clientY: y }]; doc.dispatchEvent(e); };
+  const thumb = doc.querySelector('.thumb');
+  touch('touchstart', 10, 10); touch('touchmove', 10, 60); // 위아래로 스크롤
+  thumb.dispatchEvent(new win.Event('click'));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(copied, [], '스크롤은 복사가 아님');
+  await new Promise((r) => setTimeout(r, 450));
+  touch('touchstart', 10, 10); touch('touchmove', 12, 13); // 살짝 흔들림
+  thumb.dispatchEvent(new win.Event('click'));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(copied.length, 1, '10px 이내로 흔들린 터치는 누르기');
 });
 
 test('페이지: 보여 줄 명령어가 없으면 안내만 나온다', () => {

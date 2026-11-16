@@ -39,6 +39,13 @@ main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 64px; }
 .thumb:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
 .sub { position: absolute; top: 6px; left: 6px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; pointer-events: none; }
 .tip { position: absolute; inset: 0; display: none; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 8px; background: linear-gradient(to top, rgba(10, 12, 28, .92) 55%, rgba(10, 12, 28, .55)); color: #fff; overflow: auto; pointer-events: none; }
+@media (max-width: 640px) { /* 폰: 5열로 화면을 촘촘히 씁니다. */
+  main { padding-left: 10px; padding-right: 10px; }
+  .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+  .card { border-radius: 8px; }
+  .thumb { padding: 4px; }
+  .sub { top: 2px; left: 2px; font-size: 9px; padding: 0 4px; }
+}
 @media (hover: hover) {
   .card:hover .tip { display: flex; }
 }
@@ -67,14 +74,6 @@ code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--ac
 .sample:not(.play) .bb-marquee-inner { padding-left: 0; }
 .note { color: var(--muted); font-size: 13px; margin: 10px 2px 0; }
 @media (max-width: 640px) { .bbrow { grid-template-columns: 1fr; } }
-.sheetbg { position: fixed; inset: 0; z-index: 20; display: none; align-items: flex-end; justify-content: center; background: rgba(10, 12, 28, .55); }
-.sheetbg.open { display: flex; }
-.sheet { width: min(480px, 100%); background: var(--card); border-radius: 18px 18px 0 0; padding: 16px 16px 24px; box-shadow: 0 -4px 24px rgba(0, 0, 0, .3); }
-.sheet img { display: block; width: 120px; height: 120px; object-fit: contain; margin: 0 auto 10px; background: var(--thumb); border-radius: 12px; padding: 8px; }
-.sheet .chips { justify-content: center; }
-.sheet .chip { font-size: 16px; padding: 6px 16px; background: var(--accent); color: #fff; }
-.sheet .tagtext { display: block; text-align: center; margin-top: 10px; color: var(--muted); }
-.sheet .close { display: block; margin: 14px auto 0; border: 1px solid var(--line); background: none; color: var(--ink); border-radius: 999px; padding: 5px 20px; font: inherit; cursor: pointer; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); text-align: center; z-index: 30; background: #1c2033; color: #fff; padding: 9px 18px; border-radius: 999px; font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 </style>
@@ -95,9 +94,6 @@ code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--ac
     <p id="bbnote" class="note"></p>
   </section>
 </main>
-<div id="sheetbg" class="sheetbg" role="dialog" aria-modal="true" aria-label="명령어">
-  <div class="sheet" id="sheet"></div>
-</div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script id="data" type="application/json">/*DATA*/</script>
 <script>/*BBJS*/</script>
@@ -155,6 +151,19 @@ code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--ac
     return box;
   }
 
+  // 터치 스크롤과 누르기를 구분합니다. 손가락이 조금이라도 크게 움직였으면 그 터치는 복사가 아닙니다.
+  var touchStart = null, lastMove = 0;
+  document.addEventListener('touchstart', function (e) {
+    var t = e.touches[0]; touchStart = t ? { x: t.clientX, y: t.clientY } : null;
+    if (Date.now() - lastMove > 400) lastMove = 0;
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    var t = e.touches[0];
+    if (!t || !touchStart || Math.abs(t.clientX - touchStart.x) > 10 || Math.abs(t.clientY - touchStart.y) > 10) lastMove = Date.now();
+  }, { passive: true });
+  document.addEventListener('scroll', function () { lastMove = Date.now(); }, { passive: true });
+  function scrolledRecently() { return lastMove && Date.now() - lastMove < 400; }
+
   var cards = items.map(function (item) {
     var card = el('div', 'card');
     var thumb = el('button', 'thumb');
@@ -164,7 +173,8 @@ code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--ac
     img.src = item.src; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
     thumb.appendChild(img);
     thumb.addEventListener('click', function () {
-      if (touch) openSheet(item); else copy(item.triggers[0]);
+      if (scrolledRecently()) return; // 스크롤하던 손가락이 떨어지는 순간은 복사로 치지 않습니다.
+      copy(item.triggers[0]);
     });
     card.appendChild(thumb);
     if (item.subscriber) card.appendChild(el('span', 'sub', '구독자'));
@@ -177,27 +187,6 @@ code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: var(--ac
   });
   var grid = $('grid');
   cards.forEach(function (c) { grid.appendChild(c); });
-
-  // ---------- 폰: 눌러서 보는 창 ----------
-  var sheetbg = $('sheetbg');
-  function closeSheet() { sheetbg.classList.remove('open'); }
-  function openSheet(item) {
-    var s = $('sheet');
-    s.textContent = '';
-    var img = document.createElement('img');
-    img.src = item.src; img.alt = '';
-    s.appendChild(img);
-    s.appendChild(chipsFor(item));
-    if (item.subscriber) s.appendChild(el('span', 'tagtext', '구독자 전용'));
-    if (item.tag) s.appendChild(el('span', 'tagtext', '태그: ' + item.tag));
-    var close = el('button', 'close', '닫기');
-    close.type = 'button';
-    close.addEventListener('click', closeSheet);
-    s.appendChild(close);
-    sheetbg.classList.add('open');
-  }
-  sheetbg.addEventListener('click', function (e) { if (e.target === sheetbg) closeSheet(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
 
   // ---------- 검색과 태그 ----------
   function matches(item) {
